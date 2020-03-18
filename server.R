@@ -105,8 +105,21 @@ server <- function(input, output) {
                                  list(x=times),interval = "confidence"))
       
       xlimit = c(1, max(nrow(dataset()), max(times)))
-      ylimit = c(1,max(max(predictions), max(dataset()[,"Toplam Vaka"])))
-      legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions))
+      if(!input$addCI){
+      
+        ylimit = c(1,max(max(predictions[,"fit"]), max(dataset()[,"Toplam Vaka"])))
+        legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"fit"]))
+        
+      }
+      
+      else if(input$addCI){
+        
+        ylimit = c(1,max(max(predictions[,"upr"]), max(dataset()[,"Toplam Vaka"])))
+        legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
+        
+        
+      }
+      
       
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
@@ -128,6 +141,8 @@ server <- function(input, output) {
         
         legend(1, legendPosition, legend=c("Gözlenen", "Üstel model", "Güven aralığı (%95)"),
                col=c("blue", "red", "black"), lty=1)
+        
+        legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
         
       }else{
       
