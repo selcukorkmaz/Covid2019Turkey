@@ -12,10 +12,12 @@ ui <- fluidPage(
                   label = "Veri seçin:",
                   choices = c("Özet", "Tüm")),
       
-      # sliderInput("expTime", "Gün", value = 7, min = 1, max = 15, step = 1),
+      
       
       checkboxInput(inputId = "expModelPlot", label = "Üstel model eğrisi ekle", value = TRUE),
-      checkboxInput(inputId = "expModelSummary", label = "Üstel model sonuçlarını görüntüle", value = FALSE)
+      checkboxInput(inputId = "addCI", label = "%95 güven aralığı ekle", value = FALSE),
+      checkboxInput(inputId = "expModelSummary", label = "Üstel model sonuçlarını görüntüle", value = FALSE),
+      sliderInput("expTime", "Gün (daha sonraki günler için üstel dağılım model kestirimleri elde edilebilir)", value = 8, min = 1, max = 15, step = 1)
       
     ),
     

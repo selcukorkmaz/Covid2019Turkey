@@ -54,7 +54,10 @@ server <- function(input, output) {
     
     data = dataset()
     
-    expmodel <- lm(log(dataset()[,"Toplam Vaka"])~ dataset()[,"Time"])
+    y = dataset()[,"Toplam Vaka"]
+    x = dataset()[,"Time"]
+    
+    expmodel <- lm(log(y)~ x)
     
     return(expmodel)
     
@@ -97,9 +100,9 @@ server <- function(input, output) {
     if(input$expModelPlot){
       
       
-      times <- seq(1,nrow(dataset()), 1)
+      times <- seq(1,input$expTime, 1)
       predictions <- exp(predict(exponentialModel(),
-                                 list(Time=times)))
+                                 list(x=times),interval = "confidence"))
       
       xlimit = c(1, max(nrow(dataset()), max(times)))
       ylimit = c(1,max(max(predictions), max(dataset()[,"Toplam Vaka"])))
@@ -109,14 +112,29 @@ server <- function(input, output) {
       plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
            main = "Türkiye'deki Toplam Koronavirüs Vakaları")
       
-      lines(seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
+      lines(seq(1:nrow(dataset()))[1:input$expTime], dataset()[,"Toplam Vaka"][1:input$expTime], lwd=2, col = "blue", xlab = "Time (s)",
             ylab = "Counts")
       
-      lines(times, predictions, lwd=2, col = "red", xlab = "Time (s)",
+      lines(times, predictions[,"fit"], lwd=2, col = "red", xlab = "Time (s)",
             ylab = "Counts")
+      
+      if(input$addCI){
+        
+        lines(times, predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
+              ylab = "Counts")
+        
+          lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
+              ylab = "Counts")
+        
+        legend(1, legendPosition, legend=c("Gözlenen", "Üstel model", "Güven aralığı (%95)"),
+               col=c("blue", "red", "black"), lty=1)
+        
+      }else{
       
       legend(1, legendPosition, legend=c("Gözlenen", "Üstel model"),
              col=c("blue", "red"), lty=1)
+      
+      }
       
       
     }
