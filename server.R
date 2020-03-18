@@ -33,7 +33,7 @@ server <- function(input, output) {
     
     if(input$dataset == 'Tüm'){
       
-      res <- dataset()
+      res <- dataset()[-ncol(dataset())]
 
     }
     
