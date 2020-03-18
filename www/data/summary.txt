@@ -1,0 +1,2 @@
+Tarih	Toplam Vaka	Yeni Vaka	Toplam Ölüm	Yeni Ölüm	Ölüm Oranı (%)
+17.03.2020	98	51	1	1	1.020

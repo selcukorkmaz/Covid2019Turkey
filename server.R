@@ -1,0 +1,202 @@
+library(DT)
+
+server <- function(input, output) {
+
+
+  #### Veri yükleme ####
+  dataset <- reactive({
+    
+    data <- read.table("www/data/covid_cases.txt", header = TRUE, sep = "\t")
+    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Time")
+    return(data)
+    
+  })
+  
+  summaryData <- reactive({
+    
+    data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
+    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Ölüm Oranı (%)")
+    return(data)
+    
+  })
+  
+  
+  
+  #### Tablo ####
+  result <- reactive({
+    
+    if(input$dataset == 'Özet'){
+      
+      res = summaryData()
+      
+    }
+    
+    if(input$dataset == 'Tüm'){
+      
+      res <- dataset()
+
+    }
+    
+    return(res)
+    
+  })
+  
+  output$resultTable <- DT::renderDataTable({
+    
+    result()
+
+  })
+  
+  
+  #### Üstel model ####
+  
+  exponentialModel <- reactive({
+    
+    data = dataset()
+    
+    expmodel <- lm(log(dataset()[,"Toplam Vaka"])~ dataset()[,"Time"])
+    
+    return(expmodel)
+    
+  })
+    
+  output$summaryModel <- renderPrint({
+    
+    if(input$expModelSummary){
+    
+    summary(exponentialModel())
+    
+    }
+  })
+  
+  #### Grafik ####
+  
+  ##### Toplam Vaka Grafiği ####
+  
+  output$plotTotalCases <- renderPlot({
+    
+    if(!input$expModelPlot){
+
+    xlimit = c(1, nrow(dataset()))
+    ylimit = c(1,max(dataset()[,"Toplam Vaka"]))
+    legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"])
+    
+    plot.new()
+    plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+         main = "Türkiye'deki Toplam Koronavirüs Vakaları")
+    
+    lines(seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
+          ylab = "Counts")
+
+    
+    legend(1, legendPosition, legend=c("Gözlenen"),
+           col=c("blue"), lty=1)
+    
+    }
+    
+    if(input$expModelPlot){
+      
+      
+      times <- seq(1,nrow(dataset()), 1)
+      predictions <- exp(predict(exponentialModel(),
+                                 list(Time=times)))
+      
+      xlimit = c(1, max(nrow(dataset()), max(times)))
+      ylimit = c(1,max(max(predictions), max(dataset()[,"Toplam Vaka"])))
+      legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions))
+      
+      plot.new()
+      plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+           main = "Türkiye'deki Toplam Koronavirüs Vakaları")
+      
+      lines(seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
+            ylab = "Counts")
+      
+      lines(times, predictions, lwd=2, col = "red", xlab = "Time (s)",
+            ylab = "Counts")
+      
+      legend(1, legendPosition, legend=c("Gözlenen", "Üstel model"),
+             col=c("blue", "red"), lty=1)
+      
+      
+    }
+    
+    
+  })
+  
+
+  ##### log(Toplam Vaka) Grafiği ####
+  
+  output$logPlotTotalCases <- renderPlot({
+    
+      
+      xlimit = c(1, nrow(dataset()))
+      ylimit = c(1,log(max(dataset()[,"Toplam Vaka"])))
+      legendPosition = max(log(dataset()[nrow(dataset()),"Toplam Vaka"]))
+      
+      plot.new()
+      plot(1, type="n", xlab="Gün", ylab="log(Toplam Vaka)", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+           main = "Türkiye'deki Toplam Koronavirüs Vakaları (logaritmik)")
+      
+      lines(seq(1:nrow(dataset())), log(dataset()[,"Toplam Vaka"]), lwd=2, col = "blue", xlab = "Time (s)",
+            ylab = "Counts")
+      
+      
+      legend(1, legendPosition, legend=c("log(Gözlenen)"),
+             col=c("blue"), lty=1)
+      
+    
+    
+    
+  })
+  
+  ##### Toplam Ölüm Grafiği #### 
+  plotTotalDeats <- renderPlot({
+    
+    
+    xlimit = c(1, nrow(dataset()))
+    ylimit = c(1,max(dataset()[,"Toplam Ölüm"]))
+    legendPosition = max(dataset()[nrow(dataset()),"Toplam Ölüm"])
+    
+    plot.new()
+    plot(1, type="n", xlab="Gün", ylab="Toplam Ölüm", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+         main = "Türkiye'deki Toplam Koronavirüs Ölümleri")
+    
+    lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "blue", xlab = "Time (s)",
+          ylab = "Counts")
+    
+    
+    legend(1, legendPosition, legend=c("Gözlenen"),
+           col=c("blue"), lty=1)
+    
+    
+    
+    
+  })
+  
+  
+  ##### Günlük Yeni Vakalar ####
+  
+  output$barPlotNewCases <- renderPlot({
+    
+    barplot(dataset()[,"Yeni Vaka"]~seq(1, nrow(dataset()),1), data = dataset(),
+            xlab = "Gün", ylab="Günlük Yeni Vaka Sayısı" ,main = "Günlük Yeni Vakalar", panel.first = grid())
+    
+    
+  })
+    
+    
+
+  ##### Günlük Yeni Ölümler ####
+  
+  output$barPlotNewDeaths <- renderPlot({
+    
+    barplot(dataset()[,"Yeni Ölüm"]~seq(1, nrow(dataset()),1), data = dataset(),
+            xlab = "Gün", ylab="Günlük Yeni Ölüm Sayısı" ,main = "Günlük Yeni Ölümler", panel.first = grid())
+    
+    
+  })
+  
+  
+  
+}
