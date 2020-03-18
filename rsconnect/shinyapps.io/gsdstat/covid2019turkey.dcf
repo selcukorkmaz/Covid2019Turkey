@@ -5,6 +5,6 @@ account: gsdstat
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1962574
-bundleId: 2894852
+bundleId: 2894889
 url: https://gsdstat.shinyapps.io/covid2019turkey/
-when: 1584550852.43132
+when: 1584551587.79968
