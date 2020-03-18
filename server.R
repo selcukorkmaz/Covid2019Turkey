@@ -131,7 +131,7 @@ server <- function(input, output) {
     
       
       xlimit = c(1, nrow(dataset()))
-      ylimit = c(1,log(max(dataset()[,"Toplam Vaka"])))
+      ylimit = c(0,log(max(dataset()[,"Toplam Vaka"])))
       legendPosition = max(log(dataset()[nrow(dataset()),"Toplam Vaka"]))
       
       plot.new()
