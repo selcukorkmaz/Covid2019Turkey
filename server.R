@@ -15,7 +15,7 @@ server <- function(input, output) {
   summaryData <- reactive({
     
     data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Ölüm Oranı (%)")
+    colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Ölüm Oranı (%)", "Toplam Vaka/1M Nüfus")
     return(data)
     
   })

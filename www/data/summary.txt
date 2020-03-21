@@ -1,2 +1,2 @@
-Tarih	Toplam Vaka	Yeni Vaka	Toplam Ölüm	Yeni Ölüm	Ölüm Oranı (%)
-19.03.2020	191	93	2	1	1.05
+Toplam Vaka	Toplam Ölüm	Ölüm Oranı (%)	Toplam Vaka/ Milyon Nüfus
+670	9	1.34	8
