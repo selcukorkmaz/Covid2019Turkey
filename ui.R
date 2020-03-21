@@ -13,11 +13,11 @@ ui <- fluidPage(
                   choices = c("Özet", "Tüm")),
       
       
-      
-      checkboxInput(inputId = "expModelPlot", label = "Üstel model eğrisi ekle", value = TRUE),
+      checkboxInput(inputId = "totalDeaths", label = "Ölüm vakalarını ekle", value = TRUE),
+      checkboxInput(inputId = "expModelPlot", label = "Üstel model eğrisi ekle", value = FALSE),
       checkboxInput(inputId = "addCI", label = "%95 güven aralığı ekle", value = FALSE),
       checkboxInput(inputId = "expModelSummary", label = "Üstel model sonuçlarını görüntüle", value = FALSE),
-      sliderInput("expTime", "Gün (daha sonraki günler için üstel dağılım model kestirimleri elde edilebilir)", value = 11, min = 1, max = 13, step = 1),
+      sliderInput("expTime", "Gün (daha sonraki günler için üstel dağılım model kestirimleri elde edilebilir)", value = 12, min = 1, max = 14, step = 1),
       HTML('<p><b>COVID-19 yayınları:<b></p>'),
       
       # tags$div(id = "main", style = "width: 50%"),
@@ -36,7 +36,7 @@ ui <- fluidPage(
       HTML('<br>'),
       HTML('<br>'),
       
-      HTML('<p>Son veri güncelleme: 21.03.2020, 00:01</p>')
+      HTML('<p>Son veri güncelleme: 21.03.2020, 23:15</p>')
         
  
       
@@ -44,7 +44,7 @@ ui <- fluidPage(
     
     mainPanel(
       
-      h3(textOutput("caption", container = span)),
+      # h3(textOutput("caption", container = span)),
       
         DT::dataTableOutput("resultTable"),
         plotOutput("plotTotalCases"),

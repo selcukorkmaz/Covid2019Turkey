@@ -15,7 +15,7 @@ server <- function(input, output) {
   summaryData <- reactive({
     
     data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Ölüm Oranı (%)", "Toplam Vaka/1M Nüfus")
+    colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Aktif Vaka", "Ölüm Oranı (%)", "Toplam Vaka/1M Nüfus")
     return(data)
     
   })
@@ -43,7 +43,11 @@ server <- function(input, output) {
   
   output$resultTable <- DT::renderDataTable({
     
-    result()
+    
+    datatable(result(), extensions = c('Buttons','KeyTable', 'Responsive'), rownames= FALSE,options = list(pageLength = 100, 
+      info = FALSE,bFilter = FALSE, paging = FALSE, dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),             
+                                                          text = 'İndir')), keys = TRUE
+    ))
 
   })
   
@@ -92,8 +96,19 @@ server <- function(input, output) {
           ylab = "Counts")
 
     
-    legend(1, legendPosition, legend=c("Gözlenen"),
+    legend(1, legendPosition, legend=c("Vaka"),
            col=c("blue"), lty=1)
+    
+    if(input$totalDeaths){
+    
+        lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
+              ylab = "Counts")
+        
+        
+        legend(1, legendPosition, legend=c("Vaka","Ölüm"),
+               col=c("blue", "violet"), lty=1)
+        
+    }
     
     }
     
@@ -139,18 +154,43 @@ server <- function(input, output) {
           lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
               ylab = "Counts")
         
-        legend(1, legendPosition, legend=c("Gözlenen", "Üstel model", "Güven aralığı (%95)"),
+        legend(1, legendPosition, legend=c("Vaka", "Üstel model", "Güven aralığı (%95)"),
                col=c("blue", "red", "black"), lty=1)
         
         legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
         
       }else{
       
-      legend(1, legendPosition, legend=c("Gözlenen", "Üstel model"),
+      legend(1, legendPosition, legend=c("Vaka", "Üstel model"),
              col=c("blue", "red"), lty=1)
       
       }
       
+      if(input$totalDeaths){
+        
+        lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
+              ylab = "Counts")
+        
+        
+        legend(1, legendPosition, legend=c("Vaka","Ölüm", "Üstel model"),
+               col=c("blue", "violet", "red"), lty=1)
+        
+        if(input$addCI){
+          
+          lines(times, predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
+                ylab = "Counts")
+          
+          lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
+                ylab = "Counts")
+          
+          legend(1, legendPosition, legend=c("Vaka", "Ölüm", "Üstel model", "Güven aralığı (%95)"),
+                 col=c("blue", "violet", "red", "black"), lty=1)
+          
+          legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
+          
+        }
+        
+      }
       
     }
     
