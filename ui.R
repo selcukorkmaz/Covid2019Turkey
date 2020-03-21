@@ -30,7 +30,13 @@ ui <- fluidPage(
       HTML('<a href="https://www.cell.com/2019-nCOV">Cell</a>'),
       HTML('<a href="https://academic.oup.com/journals/pages/coronavirus">Oxford</a>'),
       HTML('<a href="https://www.elsevier.com/connect/coronavirus-information-center">Elsevier</a>'),
-      HTML('<a href="https://novel-coronavirus.onlinelibrary.wiley.com/">Wiley</a>')
+      HTML('<a href="https://novel-coronavirus.onlinelibrary.wiley.com/">Wiley</a>'),
+      HTML('<a href="https://www.scientificamerican.com/tag/The+Coronavirus+Outbreak/">SciAm</a>'),
+      
+      HTML('<br>'),
+      HTML('<br>'),
+      
+      HTML('<p>Son veri güncelleme: 21.03.2020, 00:01</p>')
         
  
       
