@@ -90,7 +90,7 @@ server <- function(input, output) {
     
     plot.new()
     plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Türkiye'deki Toplam Koronavirüs Vakaları")
+         main = "Türkiye'deki Toplam COVID-19 Vakaları")
     
     lines(seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
           ylab = "Counts")
@@ -138,7 +138,7 @@ server <- function(input, output) {
       
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-           main = "Türkiye'deki Toplam Koronavirüs Vakaları")
+           main = "Türkiye'deki Toplam COVID-19 Vakaları")
       
       lines(seq(1:nrow(dataset()))[1:input$expTime], dataset()[,"Toplam Vaka"][1:input$expTime], lwd=2, col = "blue", xlab = "Time (s)",
             ylab = "Counts")
@@ -209,13 +209,13 @@ server <- function(input, output) {
       
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="log(Toplam Vaka)", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-           main = "Türkiye'deki Toplam Koronavirüs Vakaları (logaritmik)")
+           main = "Türkiye'deki Toplam COVID-19 Vakaları (logaritmik)")
       
       lines(seq(1:nrow(dataset())), log(dataset()[,"Toplam Vaka"]), lwd=2, col = "blue", xlab = "Time (s)",
             ylab = "Counts")
       
       
-      legend(1, legendPosition, legend=c("log(Gözlenen)"),
+      legend(1, legendPosition, legend=c("log(Vaka)"),
              col=c("blue"), lty=1)
       
     
@@ -233,13 +233,13 @@ server <- function(input, output) {
     
     plot.new()
     plot(1, type="n", xlab="Gün", ylab="Toplam Ölüm", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Türkiye'deki Toplam Koronavirüs Ölümleri")
+         main = "Türkiye'deki Toplam COVID-19 Ölümleri")
     
     lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "blue", xlab = "Time (s)",
           ylab = "Counts")
     
     
-    legend(1, legendPosition, legend=c("Gözlenen"),
+    legend(1, legendPosition, legend=c("Vaka"),
            col=c("blue"), lty=1)
     
     
