@@ -1,0 +1,167 @@
+no	country
+1	Afghanistan
+2	Albania
+3	Algeria
+4	Andorra
+5	Angola
+6	Antigua and Barbuda
+7	Argentina
+8	Armenia
+9	Australia
+10	Austria
+11	Azerbaijan
+12	Bahamas, The
+13	Bahrain
+14	Bangladesh
+15	Barbados
+16	Belarus
+17	Belgium
+18	Benin
+19	Bhutan
+20	Bolivia
+21	Bosnia and Herzegovina
+22	Brazil
+23	Brunei
+24	Bulgaria
+25	Burkina Faso
+26	Cabo Verde
+27	Cambodia
+28	Cameroon
+29	Canada
+30	Cape Verde
+31	Central African Republic
+32	Chad
+33	Chile
+34	China
+35	Colombia
+36	Congo (Brazzaville)
+37	Congo (Kinshasa)
+38	Costa Rica
+39	Cote d'Ivoire
+40	Croatia
+41	Cruise Ship
+42	Cuba
+43	Cyprus
+44	Czechia
+45	Denmark
+46	Djibouti
+47	Dominican Republic
+48	East Timor
+49	Ecuador
+50	Egypt
+51	El Salvador
+52	Equatorial Guinea
+53	Eritrea
+54	Estonia
+55	Eswatini
+56	Ethiopia
+57	Fiji
+58	Finland
+59	France
+60	Gabon
+61	Gambia, The
+62	Georgia
+63	Germany
+64	Ghana
+65	Greece
+66	Guatemala
+67	Guinea
+68	Guyana
+69	Haiti
+70	Holy See
+71	Honduras
+72	Hungary
+73	Iceland
+74	India
+75	Indonesia
+76	Iran
+77	Iraq
+78	Ireland
+79	Israel
+80	Italy
+81	Jamaica
+82	Japan
+83	Jordan
+84	Kazakhstan
+85	Kenya
+86	Korea, South
+87	Kosovo
+88	Kuwait
+89	Kyrgyzstan
+90	Latvia
+91	Lebanon
+92	Liberia
+93	Liechtenstein
+94	Lithuania
+95	Luxembourg
+96	Madagascar
+97	Malaysia
+98	Maldives
+99	Malta
+100	Martinique
+101	Mauritania
+102	Mauritius
+103	Mexico
+104	Moldova
+105	Monaco
+106	Mongolia
+107	Montenegro
+108	Morocco
+109	Namibia
+110	Nepal
+111	Netherlands
+112	New Zealand
+113	Nicaragua
+114	Niger
+115	Nigeria
+116	North Macedonia
+117	Norway
+118	Oman
+119	Pakistan
+120	Panama
+121	Papua New Guinea
+122	Paraguay
+123	Peru
+124	Philippines
+125	Poland
+126	Portugal
+127	Qatar
+128	Romania
+129	Russia
+130	Rwanda
+131	Saint Lucia
+132	Saint Vincent and the Grenadines
+133	San Marino
+134	Saudi Arabia
+135	Senegal
+136	Serbia
+137	Seychelles
+138	Singapore
+139	Slovakia
+140	Slovenia
+141	Somalia
+142	South Africa
+143	Spain
+144	Sri Lanka
+145	Sudan
+146	Suriname
+147	Sweden
+148	Switzerland
+149	Taiwan*
+150	Tanzania
+151	Thailand
+152	Togo
+153	Trinidad and Tobago
+154	Tunisia
+155	Turkey
+156	Uganda
+157	Ukraine
+158	United Arab Emirates
+159	United Kingdom
+160	Uruguay
+161	US
+162	Uzbekistan
+163	Venezuela
+164	Vietnam
+165	Zambia
+166	Zimbabwe
