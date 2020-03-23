@@ -73,8 +73,8 @@ server <- function(input, output, session) {
       
     }
     
-    newWorldDataFull = rbindlist(newWorldData)[,-"Province.State"]
-    colnames(newWorldDataFull)[1] = "Country"
+    newWorldDataFull = rbindlist(newWorldData, use.names = TRUE)[,-"Province.State"]
+    colnames(newWorldDataFull)[2] = "Country"
     
     return(newWorldDataFull)
   })
@@ -373,15 +373,15 @@ server <- function(input, output, session) {
     if(input$compare){
       comparedCountries = input$countries
       
-      indx = which(newWorldDataFull$Country %in% comparedCountries)
+      indx = which(dataWorld()$Country %in% comparedCountries)
       
-      compareData = data.frame(newWorldDataFull[indx,])
+      compareData = data.frame(dataWorld()[indx,])
       head(compareData)
       
       
       ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country)) +
         xlab("Gün") + ylab("Toplam Vaka") + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Karşılaştırması")
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")
       
     
     }
@@ -394,15 +394,15 @@ server <- function(input, output, session) {
     if(input$compare){
       comparedCountries = input$countries
       
-      indx = which(newWorldDataFull$Country %in% comparedCountries)
+      indx = which(dataWorld()$Country %in% comparedCountries)
       
-      compareData = data.frame(newWorldDataFull[indx,])
+      compareData = data.frame(dataWorld()[indx,])
       head(compareData)
       
       
       ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country)) +
          xlab("Gün") + ylab("Toplam Ölüm")  + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Ölüm Vaka Karşılaştırması")
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Ölüm Vaka Sayıları")
       
       
     }
@@ -415,15 +415,15 @@ server <- function(input, output, session) {
     if(input$compare){
       comparedCountries = input$countries
       
-      indx = which(newWorldDataFull$Country %in% comparedCountries)
+      indx = which(dataWorld()$Country %in% comparedCountries)
       
-      compareData = data.frame(newWorldDataFull[indx,])
+      compareData = data.frame(dataWorld()[indx,])
       head(compareData)
       
       
       ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country))+
         xlab("Gün") + ylab("Toplam İyileşen") + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam İyileşen Vaka Karşılaştırması")
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam İyileşen Vaka Sayıları")
         
       
       

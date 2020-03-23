@@ -44,6 +44,8 @@ ui <- fluidPage(
       HTML('<br>'),
       HTML('<br>'),
       
+      HTML('<p>Hata ve öneri bildirimlerinizi <a href = "mailto: selcukorkmaz@gmail.com">selcukorkmaz@gmail.com</a> adresine gönderebilirsiniz.</p>'),
+      HTML('<p>Kaynak kodlar: <a href = "https://github.com/selcukorkmaz/Covid2019Turkey">GitHub</a></p>'),
       HTML('<p>Son veri güncelleme: 22.03.2020, 22:15</p>')
         
  
