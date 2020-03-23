@@ -121,7 +121,7 @@ server <- function(input, output, session) {
   dataset <- reactive({
     
     data <- read.table("www/data/covid_cases.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Time")
+    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Toplam Test", "Yeni Test", "Time")
     return(data)
     
   })
@@ -406,7 +406,7 @@ server <- function(input, output, session) {
             
             for(counts in 1:length(unique(compareData$Country))){
               
-              sData = 
+          
               
               splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
               
@@ -416,9 +416,11 @@ server <- function(input, output, session) {
       }
         
 
-        ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country)) +
+        ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country),size = 1) +
           xlab("Gün") + ylab("Toplam Vaka") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")+
+          theme(text = element_text(size=14),legend.title=element_blank())+ 
+          theme(legend.position="bottom")
         
         
       
@@ -446,7 +448,6 @@ server <- function(input, output, session) {
         
         for(counts in 1:length(unique(compareData$Country))){
           
-          sData = 
             
             splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
           
@@ -457,9 +458,11 @@ server <- function(input, output, session) {
       
       
       
-      ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country)) +
+      ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country),size = 1) +
          xlab("Gün") + ylab("Toplam Ölüm")  + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Ölüm Vaka Sayıları")
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Ölüm Vaka Sayıları")+
+        theme(text = element_text(size=14),legend.title=element_blank())+ 
+        theme(legend.position="bottom")
       
       
     }
@@ -485,8 +488,7 @@ server <- function(input, output, session) {
         
         for(counts in 1:length(unique(compareData$Country))){
           
-          sData = 
-            
+
             splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
           
         }
@@ -495,9 +497,11 @@ server <- function(input, output, session) {
       }
       
       
-      ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country))+
+      ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1)+
         xlab("Gün") + ylab("Toplam İyileşen") + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam İyileşen Vaka Sayıları")
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam İyileşen Vaka Sayıları")+
+        theme(text = element_text(size=14),legend.title=element_blank())+ 
+        theme(legend.position="bottom")
         
       
       
