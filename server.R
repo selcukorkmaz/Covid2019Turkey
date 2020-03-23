@@ -1,6 +1,7 @@
 library(DT)
 library(data.table)
 library(ggplot2)
+library(dplyr)
 
 server <- function(input, output, session) {
 
@@ -35,6 +36,7 @@ server <- function(input, output, session) {
       c = countryNanmes[i]
       d = nrow(splitDataWorld[[c]])
       pData = splitDataWorld[[c]]
+      pData$MaxConfirmed = max(pData$Confirmed)
       
       
       if(length(pData$Province.State) > length(unique(dataWorld$Date))){
@@ -53,19 +55,30 @@ server <- function(input, output, session) {
                                                   Confirmed = sum(splitOrderedData[[j]]$Confirmed),
                                                   Recovered = sum(splitOrderedData[[j]]$Recovered),
                                                   Deaths = sum(splitOrderedData[[j]]$Deaths),
+                                                  MaxConfirmed = j,
                                                   Days = j
           )[1,]
           
         }
         
-        
-        newWorldData[[i]] = rbindlist(orderedDataList)
+        tmpData = rbindlist(orderedDataList)
+        tmpData$MaxConfirmed = max(tmpData$Confirmed)
+        if(input$firstCase){
+          
+          tmpData = dplyr::filter(tmpData, tmpData$Confirmed>0)
+          
+        }
+        newWorldData[[i]] = tmpData
         
       }else{
         
         pData$Province.State = NA
         pData$Days = seq(1, length(unique(pData$Date)), 1)
-        
+        if(input$firstCase){
+          
+          pData = dplyr::filter(pData, pData$Confirmed>0)
+          
+        }
         newWorldData[[i]] = pData
         
       }
@@ -73,19 +86,25 @@ server <- function(input, output, session) {
       
     }
     
-    newWorldDataFull = rbindlist(newWorldData, use.names = TRUE)[,-"Province.State"]
+    newWorldDataFull = rbindlist(newWorldData, use.names = TRUE, fill = TRUE)[,-"Province.State"]
     colnames(newWorldDataFull)[2] = "Country"
     
-    return(newWorldDataFull)
+    newWorldDataFull = dplyr::filter(newWorldDataFull, MaxConfirmed >= input$filter)
+    
+    countries = as.character(newWorldDataFull$Country)
+    
+    data = list(newWorldDataFull, countries)
+    
+    return(data)
   })
   
   countries <-reactive({
     
-    data <- read.table("www/data/countries.txt", sep="\t", header=TRUE, comment.char="#",
-               na.strings=".", stringsAsFactors=FALSE,
-               quote="", fill=FALSE)
+    # data <- read.table("www/data/countries.txt", sep="\t", header=TRUE, comment.char="#",
+    #            na.strings=".", stringsAsFactors=FALSE,
+    #            quote="", fill=FALSE)
     
-    return(data)
+    dataWorld()[[2]]
     
   })
     
@@ -94,7 +113,7 @@ server <- function(input, output, session) {
     
     if(input$compare){
       
-      updateSelectizeInput(session, "countries", choices =  as.character(countries()[,2]), selected = NULL)
+      updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = countries()[which(countries() == "Turkey")][1])
     }
     
   })
@@ -371,17 +390,37 @@ server <- function(input, output, session) {
   output$compareConfirmed <- renderPlot({
     
     if(input$compare){
+      
       comparedCountries = input$countries
       
-      indx = which(dataWorld()$Country %in% comparedCountries)
+      indx = which(dataWorld()[[1]]$Country %in% comparedCountries)
       
-      compareData = data.frame(dataWorld()[indx,])
-      head(compareData)
+      compareData = as.data.frame(dataWorld()[[1]][indx,])
       
-      
-      ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country)) +
-        xlab("Gün") + ylab("Toplam Vaka") + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")
+      if(input$firstCase){
+        
+        comparedCountries = input$countries
+            compareData$Country = as.character(compareData$Country)
+            
+            splitCompareData = split(compareData, compareData$Country)
+            
+            for(counts in 1:length(unique(compareData$Country))){
+              
+              sData = 
+              
+              splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+              
+            }
+            
+            compareData = rbindlist(splitCompareData)
+      }
+        
+
+        ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country)) +
+          xlab("Gün") + ylab("Toplam Vaka") + 
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")
+        
+        
       
     
     }
@@ -394,10 +433,28 @@ server <- function(input, output, session) {
     if(input$compare){
       comparedCountries = input$countries
       
-      indx = which(dataWorld()$Country %in% comparedCountries)
+      indx = which(dataWorld()[[1]]$Country %in% comparedCountries)
       
-      compareData = data.frame(dataWorld()[indx,])
-      head(compareData)
+      compareData = as.data.frame(dataWorld()[[1]][indx,])
+      
+      if(input$firstCase){
+        
+        comparedCountries = input$countries
+        compareData$Country = as.character(compareData$Country)
+        
+        splitCompareData = split(compareData, compareData$Country)
+        
+        for(counts in 1:length(unique(compareData$Country))){
+          
+          sData = 
+            
+            splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+          
+        }
+        
+        compareData = rbindlist(splitCompareData)
+      }
+      
       
       
       ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country)) +
@@ -415,10 +472,27 @@ server <- function(input, output, session) {
     if(input$compare){
       comparedCountries = input$countries
       
-      indx = which(dataWorld()$Country %in% comparedCountries)
+      indx = which(dataWorld()[[1]]$Country %in% comparedCountries)
       
-      compareData = data.frame(dataWorld()[indx,])
-      head(compareData)
+      compareData = as.data.frame(dataWorld()[[1]][indx,])
+      
+      if(input$firstCase){
+        
+        comparedCountries = input$countries
+        compareData$Country = as.character(compareData$Country)
+        
+        splitCompareData = split(compareData, compareData$Country)
+        
+        for(counts in 1:length(unique(compareData$Country))){
+          
+          sData = 
+            
+            splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+          
+        }
+        
+        compareData = rbindlist(splitCompareData)
+      }
       
       
       ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country))+

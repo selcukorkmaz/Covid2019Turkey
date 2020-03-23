@@ -1,7 +1,7 @@
 library(DT)
 
 ui <- fluidPage(
-  
+  tags$head(includeScript("google-analytics.html")),
   titlePanel("COVID-19 Türkiye"),
   
   sidebarLayout(
@@ -18,11 +18,15 @@ ui <- fluidPage(
       checkboxInput(inputId = "addCI", label = "%95 güven aralığı ekle", value = FALSE),
       checkboxInput(inputId = "expModelSummary", label = "Üstel model sonuçlarını görüntüle", value = FALSE),
       sliderInput("expTime", "Gün (daha sonraki günler için üstel dağılım model kestirimleri elde edilebilir)", value = 13, min = 1, max = 15, step = 1),
-      checkboxInput(inputId = "compare", label = "Ülkeleri karşılaştır", value = FALSE),
+      checkboxInput(inputId = "compare", label = "Ülkeleri karşılaştır", value = TRUE),
       
       conditionalPanel(condition="input.compare",
 
+        checkboxInput(inputId = "firstCase", label = "İlk vaka", value = TRUE),
+        numericInput("filter", "En az X vaka olan ülkeleri göster", value = 100),
         selectizeInput("countries", "Ülkeleri seçiniz", choices = NULL, multiple = TRUE)
+        
+        
 
       ),
       
