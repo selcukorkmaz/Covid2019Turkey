@@ -88,8 +88,24 @@ server <- function(input, output, session) {
     
     newWorldDataFull = rbindlist(newWorldData, use.names = TRUE, fill = TRUE)[,-"Province.State"]
     colnames(newWorldDataFull)[2] = "Country"
+    newWorldDataFull$Recovered[is.na(newWorldDataFull$Recovered)] <- 0
     
+  if(input$population){  
     newWorldDataFull = dplyr::filter(newWorldDataFull, MaxConfirmed >= input$filter)
+    
+    
+    population <- read.table("www/data/population.txt", sep="\t", header=TRUE, comment.char="#",
+                             na.strings=".", stringsAsFactors=FALSE,
+                             quote="", fill=FALSE)
+    
+
+    mergedData <- left_join(newWorldDataFull, population, by = c("Country" ))
+
+    newWorldDataFull$popAdjustedCase = 1000000/(mergedData$Population/mergedData$Confirmed)
+    newWorldDataFull$popAdjustedDeaths = 1000000/(mergedData$Population/mergedData$Deaths)
+    newWorldDataFull$popAdjustedRecovered = 1000000/(mergedData$Population/mergedData$Recovered)
+    
+  }
     
     countries = as.character(newWorldDataFull$Country)
     
@@ -99,10 +115,6 @@ server <- function(input, output, session) {
   })
   
   countries <-reactive({
-    
-    # data <- read.table("www/data/countries.txt", sep="\t", header=TRUE, comment.char="#",
-    #            na.strings=".", stringsAsFactors=FALSE,
-    #            quote="", fill=FALSE)
     
     dataWorld()[[2]]
     
@@ -121,7 +133,7 @@ server <- function(input, output, session) {
   dataset <- reactive({
     
     data <- read.table("www/data/covid_cases.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Toplam Test", "Yeni Test", "Time")
+    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm","Değişim (%)", "Toplam Test", "Yeni Test", "Yeni Vaka Tespit Etme Oranı (%)", "Time")
     return(data)
     
   })
@@ -129,7 +141,7 @@ server <- function(input, output, session) {
   summaryData <- reactive({
     
     data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Aktif Vaka", "Ölüm Oranı (%)", "Toplam Vaka/1M Nüfus")
+    colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Aktif Vaka", "Ölüm Oranı (%)", "Vaka Sayısı (Milyonda)")
     return(data)
     
   })
@@ -204,7 +216,7 @@ server <- function(input, output, session) {
     
     plot.new()
     plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Türkiye'deki Toplam COVID-19 Vakaları")
+         main = "Türkiye'deki Toplam Resmi COVID-19 Vakaları")
     
     lines(seq(1:nrow(dataset()))[1:input$expTime], dataset()[,"Toplam Vaka"][1:input$expTime], lwd=2, col = "blue", xlab = "Time (s)",
           ylab = "Counts")
@@ -252,7 +264,7 @@ server <- function(input, output, session) {
       
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-           main = "Türkiye'deki Toplam COVID-19 Vakaları")
+           main = "Türkiye'deki Toplam Resmi COVID-19 Vakaları")
       
       lines(seq(1:nrow(dataset()))[1:input$expTime], dataset()[,"Toplam Vaka"][1:input$expTime], lwd=2, col = "blue", xlab = "Time (s)",
             ylab = "Counts")
@@ -323,7 +335,7 @@ server <- function(input, output, session) {
       
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="log(Toplam Vaka)", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-           main = "Türkiye'deki Toplam COVID-19 Vakaları (logaritmik)")
+           main = "Türkiye'deki Toplam Resmi COVID-19 Vakaları (logaritmik)")
       
       lines(seq(1:nrow(dataset()))[1:input$expTime], log(dataset()[,"Toplam Vaka"][1:input$expTime]), lwd=2, col = "blue", xlab = "Time (s)",
             ylab = "Counts")
@@ -333,6 +345,41 @@ server <- function(input, output, session) {
              col=c("blue"), lty=1)
       
     
+    
+    
+  })
+  
+  ##### Test vs Vaka #### 
+  
+  output$testVsCasePlot <- renderPlot({
+    
+    
+    data = dataset()
+    
+    time <- data$Time
+    newTest <- data$`Yeni Test`
+    newCaseRatio <- data$`Yeni Vaka Tespit Etme Oranı (%)`
+    
+    par(mar=c(5, 4, 4, 6) + 0.1)
+    
+    ylimit = max(newTest, na.rm = TRUE)
+    plot(time, newTest, axes=FALSE, ylim=c(0,ylimit), xlab="", ylab="",  panel.first = grid(),
+         type="l",col="blue", main="Yeni Test Sayısı ve Yeni Vaka Tespit Oranı", lwd = 2)
+    axis(2, ylim=c(0,ylimit),col="blue",col.axis="blue", las=1)  ## las=1 makes horizontal labels
+    mtext("Yeni Test Sayısı",col="blue",side=2,line=3)
+    box()
+    
+    
+    par(new=TRUE)
+    
+    ylimit2 = max(newCaseRatio, na.rm = TRUE)
+    plot(time, newCaseRatio,  xlab="", ylab="", ylim=c(0,ylimit2), 
+         axes=FALSE, type="l", col="red", panel.first = grid(), lwd=2)
+    mtext("Yeni Vaka Tespit Etme Oranı (%)",side=4,col="red",line=2.5) 
+    axis(4, ylim=c(0,ylimit2), col="red",col.axis="red",las=2)
+    
+    axis(1,pretty(range(time),length(time)))
+    mtext("Gün",side=1,col="black",line=2.5)  
     
     
   })
@@ -415,14 +462,22 @@ server <- function(input, output, session) {
             compareData = rbindlist(splitCompareData)
       }
         
-
+      if(!input$population){
         ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country),size = 1) +
           xlab("Gün") + ylab("Toplam Vaka") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Vaka Sayıları")+
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Vaka Sayıları")+
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom")
         
+      }else{
         
+        ggplot(data = compareData, aes(x=Days, y=popAdjustedCase)) + geom_line(aes(colour=Country),size = 1) +
+          xlab("Gün") + ylab("Toplam Vaka (Milyonda)") + 
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Vaka Sayıları(Milyonda)")+
+          theme(text = element_text(size=14),legend.title=element_blank())+ 
+          theme(legend.position="bottom")
+        
+      }
       
     
     }
@@ -456,14 +511,23 @@ server <- function(input, output, session) {
         compareData = rbindlist(splitCompareData)
       }
       
-      
+      if(!input$population){
       
       ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country),size = 1) +
          xlab("Gün") + ylab("Toplam Ölüm")  + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Ölüm Vaka Sayıları")+
+        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Ölüm Vaka Sayıları")+
         theme(text = element_text(size=14),legend.title=element_blank())+ 
         theme(legend.position="bottom")
       
+      }else{
+        
+        ggplot(data = compareData, aes(x=Days, y=popAdjustedDeaths)) + geom_line(aes(colour=Country),size = 1) +
+          xlab("Gün") + ylab("Toplam Ölüm (Milyonda)")  + 
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Ölüm Vaka Sayıları (Milyonda)")+
+          theme(text = element_text(size=14),legend.title=element_blank())+ 
+          theme(legend.position="bottom")
+        
+      }
       
     }
     
@@ -496,14 +560,22 @@ server <- function(input, output, session) {
         compareData = rbindlist(splitCompareData)
       }
       
-      
-      ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1)+
-        xlab("Gün") + ylab("Toplam İyileşen") + 
-        scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam İyileşen Vaka Sayıları")+
-        theme(text = element_text(size=14),legend.title=element_blank())+ 
-        theme(legend.position="bottom")
+      if(!input$population){
+        ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1)+
+          xlab("Gün") + ylab("Toplam İyileşen") + 
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi İyileşen Vaka Sayıları")+
+          theme(text = element_text(size=14),legend.title=element_blank())+ 
+          theme(legend.position="bottom")
+          
+      }else{
         
-      
+        ggplot(data = compareData, aes(x=Days, y=popAdjustedRecovered)) + geom_line(aes(colour=Country),size = 1)+
+          xlab("Gün") + ylab("Toplam İyileşen (Milyonda)") + 
+          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi İyileşen Vaka Sayıları (Milyonda)")+
+          theme(text = element_text(size=14),legend.title=element_blank())+ 
+          theme(legend.position="bottom")
+        
+      }
       
     }
     
