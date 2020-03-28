@@ -1,2 +1,2 @@
-Toplam Vaka	Toplam Ölüm	Aktif Vaka	Ölüm Oranı (%)	Toplam Vaka/ Milyon Nüfus
-3629	75	3554	2.07	43
+Toplam Vaka	Toplam Ölüm	İyileşen Vaka	Aktif Vaka	Ölüm Oranı (%)	Toplam Vaka/ Milyon Nüfus
+7402	108	70	7224	1.46	88
