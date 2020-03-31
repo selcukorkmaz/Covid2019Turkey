@@ -782,9 +782,12 @@ server <- function(input, output, session) {
           ,input$firstCase+input$firstCase*99,input$firstCase+input$firstCase*199,input$firstCase+input$firstCase*499
           ,input$firstCase+input$firstCase*999)
           
+          lim = c(min(compareData$Confirmed),max(compareData$Confirmed))
+          
           }else{
             
             breakPoints = waiver()
+            lim = c(input$firstCase,max(compareData$Confirmed))
             
           }
         
@@ -795,7 +798,7 @@ server <- function(input, output, session) {
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom") +scale_y_continuous(trans = transform,
                                                               breaks = breakPoints,
-                                                               limits = c(min(compareData$Confirmed),max(compareData$Confirmed)))
+                                                               limits = lim)
         
         
       if(input$trajectory){
@@ -971,10 +974,12 @@ server <- function(input, output, session) {
                           input$firstDeath+input$firstDeath*9,input$firstDeath+input$firstDeath*19,input$firstDeath+input$firstDeath*49
                           ,input$firstDeath+input$firstDeath*99,input$firstDeath+input$firstDeath*199,input$firstDeath+input$firstDeath*499
                           ,input$firstDeath+input$firstDeath*999)
+          lim = c(min(compareData$Deaths),max(compareData$Deaths))
           
         }else{
           
           breakPoints = waiver()
+          lim = c(input$firstDeath,max(compareData$Deaths))
           
         }
         
@@ -984,7 +989,7 @@ server <- function(input, output, session) {
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom") +
           scale_y_continuous(trans = transform, breaks = breakPoints,
-                             limits = c(min(compareData$Deaths),max(compareData$Deaths)))
+                             limits = lim)
         
         
         
@@ -1074,7 +1079,7 @@ server <- function(input, output, session) {
     
       
       compareData = comparedCountries()
-      
+      maxLimit = max(compareData$Recovered)
       splitCompareData = split(compareData, compareData$Country)
       
       for(counts in 1:length(unique(compareData$Country))){
@@ -1166,9 +1171,12 @@ server <- function(input, output, session) {
                         
                           )
           
+          lim = c(min(compareData$Recover),maxLimit)
+          
         }else{
           
           breakPoints = waiver()
+          lim = c(input$firstRecover,maxLimit)
           
         }
 
@@ -1178,7 +1186,7 @@ server <- function(input, output, session) {
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom") +
           scale_y_continuous(trans = transform, breaks = breakPoints,
-                             limits = c(input$firstRecover,max(compareData$Recovered)))
+                             limits = c(input$firstRecover,maxLimit))
         
        
        if(input$trajectory){
@@ -1309,6 +1317,12 @@ server <- function(input, output, session) {
     
     "Bölüm 2. Dünyadaki COVID-19 Vaka İstatistikleri"
   })
+  
+  output$table2 <- renderText({
+    
+    "Bölüm 2. Dünyadaki COVID-19 Vaka İstatistikleri"
+  })
+  
   
   
 }

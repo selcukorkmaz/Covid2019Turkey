@@ -30,38 +30,21 @@ ui <- fluidPage(
         numericInput("filter", "En az X vaka olan ülkeleri göster", value = 100),
         numericInput("firstCase", "Verileri en az X adet görülen vakadan başlat (toplam vaka grafiği için)", value = 100),
         numericInput("firstDeath", "Verileri en az X adet ölümden başlat  (toplam ölüm grafiği için)", value = 10),
-        numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 5),
+        numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 5)
         # checkboxInput(inputId = "population", label = "Nüfusa göre düzeltme uygula", value = FALSE),
         
         
 
       # ),
       
-      HTML('<p><b>COVID-19 yayınları:<b></p>'),
+      
       
       # tags$div(id = "main", style = "width: 50%"),
       
-      HTML('<a href="https://www.nejm.org/coronavirus" target="_blank">NEJM</a>'),
-      HTML('<a href="https://www.thelancet.com/coronavirus" target="_blank">Lancet</a>'),
-      HTML('<a href="https://www.nature.com/collections/hajgidghjb" target="_blank">Nature</a>'),
-      HTML('<a href="https://www.bmj.com/coronavirus" target="_blank">BMJ</a>'),
-      HTML('<a href="https://jamanetwork.com/journals/jama/pages/coronavirus-alert" target="_blank">JAMA</a>'),
-      HTML('<a href="https://www.cell.com/2019-nCOV" target="_blank">Cell</a>'),
-      HTML('<a href="https://academic.oup.com/journals/pages/coronavirus" target="_blank">Oxford</a>'),
-      HTML('<a href="https://www.elsevier.com/connect/coronavirus-information-center" target="_blank">Elsevier</a>'),
-      HTML('<a href="https://novel-coronavirus.onlinelibrary.wiley.com/" target="_blank">Wiley</a>'),
-      HTML('<a href="https://www.scientificamerican.com/tag/The+Coronavirus+Outbreak/" target="_blank">SciAm</a>'),
+     
+
       
-      HTML('<br>'),
-      HTML('<br>'),
-      
-      HTML('<p>Hata ve öneri bildirimlerinizi <a href = "mailto: selcukorkmaz@gmail.com">selcukorkmaz@gmail.com</a> adresine gönderebilirsiniz.</p>'),
-      HTML('<p>Kaynak kodlar: <a href = "https://github.com/selcukorkmaz/Covid2019Turkey" target="_blank">GitHub</a></p>'),
-      HTML('<p>Türkiye verileri son güncelleme: 30.03.2020, 20:00</p>'),
-      HTML("<p>Türkiye verileri T.C. Sağlık Bakanı <a href = 'https://twitter.com/drfahrettinkoca' target='_blank'>Dr. Fahrettin KOCA</a>'dan alınmaktadır.</p>"),
-      HTML('<p>Dünya verileri <a href = "https://github.com/CSSEGISandData/COVID-19" target="_blank">JHU CSSE</a> veritabanından alınmaktadır.</p>')
-        
- 
+   
       
     ),
     
@@ -91,7 +74,33 @@ ui <- fluidPage(
         # plotOutput("testComparisonPlot"),
         # plotOutput("testComparisonPopAdjustedPlot"),
         plotOutput("testComparisonPopTestAdjustedPlot"),
-        verbatimTextOutput('summaryModel')
+        verbatimTextOutput('summaryModel'),
+        
+        # WHERE YOUR FOOTER GOES
+        hr(),
+        HTML('<p><b>Kaynak kodlar: <a href = "https://github.com/selcukorkmaz/Covid2019Turkey" target="_blank">GitHub</a></b></p>'),
+        HTML('<p><b>Türkiye verileri son güncelleme: 30.03.2020, 20:00</b></p>'),
+        HTML("<p><b>Türkiye verileri <a href = 'https://covid19.saglik.gov.tr' target='_blank'>T.C. Sağlık Bakanlığı</a>'ndan alınmaktadır.</b></p>"),
+        HTML('<p><b>Dünya verileri <a href = "https://github.com/CSSEGISandData/COVID-19" target="_blank">JHU CSSE</a> veritabanından alınmaktadır.</b></p>'),
+        HTML("<p><b>Katlanma grafikleri <a href = 'https://twitter.com/jburnmurdoch' target='_blank'>John Burn-Murdoch</a>'dan uyarlanmıştır.</b></p>"),
+        HTML("<p><b>Ülkelerin test sayısı ve vaka sayısı karşılaştırma grafiği 28-30 Mart 2020 arasında <a href = 'https://en.wikipedia.org/wiki/COVID-19_testing' target='_blank'> paylaşılan veriler</a> kullanılarak oluşturulmuştur.</b></p>"),
+        
+        HTML('<b>COVID-19 yayınları:<b>'),
+        HTML('<a href="https://www.nejm.org/coronavirus" target="_blank">NEJM</a>'),
+        HTML('<a href="https://www.thelancet.com/coronavirus" target="_blank">Lancet</a>'),
+        HTML('<a href="https://www.nature.com/collections/hajgidghjb" target="_blank">Nature</a>'),
+        HTML('<a href="https://www.bmj.com/coronavirus" target="_blank">BMJ</a>'),
+        HTML('<a href="https://jamanetwork.com/journals/jama/pages/coronavirus-alert" target="_blank">JAMA</a>'),
+        HTML('<a href="https://www.cell.com/2019-nCOV" target="_blank">Cell</a>'),
+        HTML('<a href="https://academic.oup.com/journals/pages/coronavirus" target="_blank">Oxford</a>'),
+        HTML('<a href="https://www.elsevier.com/connect/coronavirus-information-center" target="_blank">Elsevier</a>'),
+        HTML('<a href="https://novel-coronavirus.onlinelibrary.wiley.com/" target="_blank">Wiley</a>'),
+        HTML('<a href="https://www.scientificamerican.com/tag/The+Coronavirus+Outbreak/" target="_blank">SciAm</a></p>'),
+
+        HTML('<p><b>Hata ve öneri bildirimlerinizi <a href = "mailto: selcukorkmaz@gmail.com">selcukorkmaz@gmail.com</a> adresine gönderebilirsiniz.</b></p>')
+        
+        
+        
 
       
 
