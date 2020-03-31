@@ -7,9 +7,9 @@ ui <- fluidPage(
   sidebarLayout(
     
     sidebarPanel(
-      
+      h4("Türkiye İstatistikleri"),
       selectInput(inputId = "dataset",
-                  label = "Veri seçin:",
+                  label = "Veri seçiniz",
                   choices = c("Özet", "Tüm")),
       
       # checkboxInput(inputId = "totalDeaths", label = "Ölüm vakalarını ekle", value = TRUE),
@@ -17,22 +17,25 @@ ui <- fluidPage(
       # checkboxInput(inputId = "addCI", label = "%95 güven aralığı ekle", value = FALSE),
       checkboxInput(inputId = "expModelSummary", label = "Üstel model sonuçlarını görüntüle", value = FALSE),
       # sliderInput("expTime", "Gün (daha sonraki günler için üstel dağılım model kestirimleri elde edilebilir)", value = 18, min = 1, max = 20, step = 1),
-      checkboxInput(inputId = "compare", label = "Ülkeleri karşılaştır", value = TRUE),
       
-      conditionalPanel(condition="input.compare",
+      h4("Dünya İstatistikleri"),
+      # checkboxInput(inputId = "compare", label = "Ülkeleri karşılaştır", value = TRUE),
+      
+      # conditionalPanel(condition="input.compare",
 
         # checkboxInput(inputId = "firstCase", label = "Verileri ilk görülen vakadan başlat", value = TRUE),
         selectizeInput("countries", "Ülke seçiniz", choices = NULL, multiple = TRUE),
         checkboxInput(inputId = "logTransform", label = "Logaritmik dönüşüm uygula", value = TRUE),
+        checkboxInput(inputId = "trajectory", label = "Katlanma doğrularını ekle", value = TRUE),
         numericInput("filter", "En az X vaka olan ülkeleri göster", value = 100),
         numericInput("firstCase", "Verileri en az X adet görülen vakadan başlat (toplam vaka grafiği için)", value = 100),
         numericInput("firstDeath", "Verileri en az X adet ölümden başlat  (toplam ölüm grafiği için)", value = 10),
-        numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 1)
+        numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 5),
         # checkboxInput(inputId = "population", label = "Nüfusa göre düzeltme uygula", value = FALSE),
         
         
 
-      ),
+      # ),
       
       HTML('<p><b>COVID-19 yayınları:<b></p>'),
       
@@ -54,7 +57,8 @@ ui <- fluidPage(
       
       HTML('<p>Hata ve öneri bildirimlerinizi <a href = "mailto: selcukorkmaz@gmail.com">selcukorkmaz@gmail.com</a> adresine gönderebilirsiniz.</p>'),
       HTML('<p>Kaynak kodlar: <a href = "https://github.com/selcukorkmaz/Covid2019Turkey" target="_blank">GitHub</a></p>'),
-      HTML('<p>Türkiye verileri son güncelleme: 28.03.2020, 20:00</p>'),
+      HTML('<p>Türkiye verileri son güncelleme: 30.03.2020, 20:00</p>'),
+      HTML("<p>Türkiye verileri T.C. Sağlık Bakanı <a href = 'https://twitter.com/drfahrettinkoca' target='_blank'>Dr. Fahrettin KOCA</a>'dan alınmaktadır.</p>"),
       HTML('<p>Dünya verileri <a href = "https://github.com/CSSEGISandData/COVID-19" target="_blank">JHU CSSE</a> veritabanından alınmaktadır.</p>')
         
  
@@ -72,6 +76,7 @@ ui <- fluidPage(
         # plotOutput("plotTotalDeats"),
         plotOutput("plotTotalTests"),
         plotOutput("testVsCasePlot"),
+        plotOutput("plotTotalICU"),
         plotOutput("barPlotNewCases"),
         plotOutput("barPlotNewDeaths"),
         plotOutput("barPlotNewRecovered"),
@@ -83,6 +88,9 @@ ui <- fluidPage(
         plotOutput("compareConfirmed"),
         plotOutput("compareDeaths"),
         plotOutput("compareRecovered"),
+        # plotOutput("testComparisonPlot"),
+        # plotOutput("testComparisonPopAdjustedPlot"),
+        plotOutput("testComparisonPopTestAdjustedPlot"),
         verbatimTextOutput('summaryModel')
 
       

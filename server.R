@@ -1,15 +1,17 @@
 library(DT)
 library(data.table)
 library(ggplot2)
+library(plyr)
 library(dplyr)
 library(tidyr)
-library(plyr)
+
 
 server <- function(input, output, session) {
 
 
   #### Veri yükleme ####
   
+  #### Dünya verileri ####
   dataWorld <-reactive({
     
     url = "https://raw.githubusercontent.com/datasets/covid-19/master/data/time-series-19-covid-combined.csv"
@@ -67,11 +69,40 @@ server <- function(input, output, session) {
       c = countryNanmes[i]
       d = nrow(splitDataWorld[[c]])
       pData = splitDataWorld[[c]]
-      pData$MaxConfirmed = max(pData$Confirmed)
-      pData$MaxRecovered = max(pData$Recovered)
-      pData$MaxDeaths = max(pData$Deaths)
+      pData$Date = as.character(pData$Date)
+      pData$MaxConfirmed = max(pData$Confirmed, na.rm = TRUE)
+      pData$MaxRecovered = max(pData$Recovered, na.rm = TRUE)
+      pData$MaxDeaths = max(pData$Deaths, na.rm = TRUE)
       
-      if(length(pData$Province.State) > length(unique(dataWorld$Date))){
+      if(c == "Turkey"){
+        
+        
+        insertRow <- function(existingDF, newrow, r) {
+          existingDF[seq(r+1,nrow(existingDF)+1),] <- existingDF[seq(r,nrow(existingDF)),]
+          existingDF[r,] <- newrow
+          existingDF
+        }
+        
+        missingTurkey = cbind.data.frame( Date = as.factor("2020-01-21"),
+                                          Country.Region = c("Turkey"),
+                                          Province.State = c(NA),
+                                          Lat = c(38.9637),
+                                          Long = c(35.2433),
+                                          Confirmed = c(947),
+                                          Recovered = c(0),
+                                          Deaths =  c(21),
+                                          MaxConfirmed = max(pData$Confirmed, na.rm = TRUE),
+                                          MaxRecovered = max(pData$Recovered, na.rm = TRUE),
+                                          MaxDeaths = max(pData$Deaths, na.rm = TRUE),
+                                          Days = c(0))
+        missingTurkey$Date = as.character(missingTurkey$Date)
+        pData = insertRow(pData, missingTurkey, r = nrow(pData[pData$Confirmed <= 1236,]))
+        
+        
+        
+      }
+      
+      if((length(pData$Province.State) > length(unique(dataWorld$Date)))  && c != "Turkey"){
         
         orderedData = setDT(pData)[order(Country.Region, Confirmed), .SD, .(Date)]
         orderedDataList = list()
@@ -84,9 +115,9 @@ server <- function(input, output, session) {
                                                   Lat = unique(splitOrderedData[[j]]$Lat)[1],
                                                   Long = unique(splitOrderedData[[j]]$Long)[1],
                                                   Date = unique(splitOrderedData[[j]]$Date),
-                                                  Confirmed = sum(splitOrderedData[[j]]$Confirmed),
-                                                  Recovered = sum(splitOrderedData[[j]]$Recovered),
-                                                  Deaths = sum(splitOrderedData[[j]]$Deaths),
+                                                  Confirmed = sum(splitOrderedData[[j]]$Confirmed, na.rm = TRUE),
+                                                  Recovered = sum(splitOrderedData[[j]]$Recovered, na.rm = TRUE),
+                                                  Deaths = sum(splitOrderedData[[j]]$Deaths, na.rm = TRUE),
                                                   MaxConfirmed = j,
                                                   MaxRecovered = j,
                                                   MaxDeaths = j,
@@ -96,25 +127,37 @@ server <- function(input, output, session) {
         }
         
         tmpData = rbindlist(orderedDataList)
-        tmpData$MaxConfirmed = max(tmpData$Confirmed)
-        tmpData$MaxRecovered = max(tmpData$Recovered)
-        tmpData$MaxDeaths = max(tmpData$Deaths)
-        # if(input$firstCase){
+        tmpData$MaxConfirmed = max(tmpData$Confirmed, na.rm = TRUE)
+        tmpData$MaxRecovered = max(tmpData$Recovered, na.rm = TRUE)
+        tmpData$MaxDeaths = max(tmpData$Deaths, na.rm = TRUE)
+
+        
+        if(c == "China"){
           
-          # tmpData = dplyr::filter(tmpData, tmpData$Confirmed >= input$firstCase)
+          earlyChina = cbind.data.frame(Province.State = c(NA,NA,NA,NA),
+                                        Country.Region = c("China","China","China","China"),
+                                        Lat = c(37.8099,37.8099,37.8099,37.8099),
+                                        Long = c(101.0583,101.0583,101.0583,101.0583),
+                                        Date = c("2020-01-18","2020-01-19","2020-01-20","2020-01-21"),
+                                        Confirmed = c(80, 216,235,386),
+                                        Recovered = c(0,0,0,0),
+                                        Deaths =  c(0,0,0,6),
+                                        MaxConfirmed = c(max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE)),
+                                        MaxRecovered = c(max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE)),
+                                        MaxDeaths = c(max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE)),
+                                        Days = c(0,0,0,0))
           
-        # }
+          tmpData = rbind.data.frame(earlyChina, tmpData)
+          
+        }
+        
         newWorldData[[i]] = tmpData
         
       }else{
         
         pData$Province.State = NA
         pData$Days = seq(1, length(unique(pData$Date)), 1)
-        # if(input$firstCase){
-          
-          # pData = dplyr::filter(pData, pData$Confirmed >= input$firstCase)
-          
-        # }
+
         newWorldData[[i]] = pData
         
       }
@@ -158,30 +201,35 @@ server <- function(input, output, session) {
     return(data)
   })
   
+  ##### Ülke isimleri #####
   countries <-reactive({
     
     dataWorld()[[2]]
     
   })
     
-  
   observe({
     
-    if(input$compare){
+    
       
-      updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = c("Turkey", "Germany", "Italy", "Spain","France","Iran", "US", "Korea, South", "Japan", "Singapore"))
-    }
+      updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = c("Turkey", "Germany", "Italy", "Spain","France","Iran", "US", "China"))
+    
     
   })
   
+  #### Türkiye tüm veriler ####
   dataset <- reactive({
     
     data <- read.table("www/data/covid_cases.txt", header = TRUE, sep = "\t")
-    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", "Toplam İyileşme", "Yeni İyileşme",  "Vaka Değişim Oranı (%)", "Toplam Test", "Yeni Test", "Yeni Vaka Tespit Etme Oranı (%)", "Time")
+    colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm", 
+                       "Toplam İyileşme", "Yeni İyileşme",  "Toplam Yoğun Bakım Hasta Sayısı",
+                       "Toplam Entübe Hasta Sayısı", "Toplam Test", "Yeni Test",
+                       "Vaka Değişim Oranı (%)", "Yeni Vaka Tespit Etme Oranı (%)", "Time")
     return(data)
     
   })
   
+  #### Türkiye özet veriler ####
   summaryData <- reactive({
     
     data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
@@ -191,6 +239,54 @@ server <- function(input, output, session) {
   })
   
   
+  #### Dünya Test verileri ####
+  dataTest <- reactive({
+    
+    test = read.table("www/data/tests.txt", header=FALSE, comment.char="#",
+                      na.strings=".", stringsAsFactors=FALSE,
+                      quote="", fill=TRUE, sep = "\t")
+    
+    colnames(test) = c("Country", "Tests", "Positive", "Date", "Test_million_population", "Positive_Thousand_Test", "Ref")
+    
+    head(test)
+    test$Country
+    
+    splitTest = split(test, test$Country)
+    testCountries = list()
+    
+    for(i in 1:length(splitTest)){
+      
+      df = splitTest[i]
+      
+      if(grepl(":", names(df))){
+        
+        df = NULL
+        
+        
+      }
+      
+      else if(grepl("\\(", names(df))){
+        
+        df[[1]]$Country =  gsub("\\(.*","",names(df))
+      }
+      
+      testCountries[i] = df
+    }
+    
+    
+    combinedTestCountries = data.table::rbindlist(testCountries)
+    
+    combinedTestCountries = combinedTestCountries[complete.cases(combinedTestCountries),]
+    
+    testCompared = c(" Australia", " Canada", " Denmark", " Italy", " Japan", " Norway",
+                     " Portugal", " South Korea", " Switzerland"," Turkey",
+                     " United Kingdom", " United States ", " Finland"," Poland" 
+    )
+    plotData = combinedTestCountries[combinedTestCountries$Country %in% testCompared,]
+    
+    return(plotData)
+    
+  })
   
   #### Tablo ####
   result <- reactive({
@@ -211,6 +307,7 @@ server <- function(input, output, session) {
     
   })
   
+  #### Türkiye istatistikleri #####
   output$resultTable <- DT::renderDataTable({
     
     
@@ -223,7 +320,6 @@ server <- function(input, output, session) {
   
   
   #### Üstel model ####
-  
   exponentialModel <- reactive({
     
     data = dataset()
@@ -238,6 +334,7 @@ server <- function(input, output, session) {
     
   })
     
+  #### Üstel model özeti #####  
   output$summaryModel <- renderPrint({
     
     if(input$expModelSummary){
@@ -254,8 +351,8 @@ server <- function(input, output, session) {
     if(!input$expModelPlot){
 
     xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(dataset()[,"Toplam Vaka"]))
-    legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"])
+    ylimit = c(1,max(dataset()[,"Toplam Vaka"], na.rm = TRUE))
+    legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], na.rm = TRUE)
     
     plot.new()
     plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
@@ -287,8 +384,8 @@ server <- function(input, output, session) {
       predictions <- exp(predict(exponentialModel(),
                                  list(x=times),interval = "confidence"))
       
-      xlimit = c(1, max(nrow(dataset()), max(times)))
-      ylimit = c(1,max(max(predictions[,"fit"]), max(dataset()[,"Toplam Vaka"])))
+      xlimit = c(1, max(nrow(dataset()), max(times, na.rm = TRUE), na.rm = TRUE))
+      ylimit = c(1,max(max(predictions[,"fit"], na.rm = TRUE), max(dataset()[,"Toplam Vaka"], na.rm = TRUE), na.rm = TRUE))
 
       plot.new()
       plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
@@ -346,7 +443,6 @@ server <- function(input, output, session) {
     
     
   })
-  
   
   ##### Toplam Ölüm ve İyileşme Grafiği ####
   
@@ -468,7 +564,7 @@ server <- function(input, output, session) {
     
     
     xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(dataset()[,"Toplam Test"]))
+    ylimit = c(1,max(dataset()[,"Toplam Test"], na.rm = TRUE))
 
     plot.new()
     plot(1, type="n", xlab="Gün", ylab="Toplam Test", xlim=xlimit, ylim=ylimit, panel.first = grid(),
@@ -485,6 +581,33 @@ server <- function(input, output, session) {
     
   })
   
+  ##### Toplam Yoğun Bakım ve Entübe Hasta Sayısı ####
+  
+  output$plotTotalICU <- renderPlot({
+    
+
+    
+    xlimit = c(1, nrow(dataset()))
+    ylimit = c(1,max(max(dataset()[,"Toplam Entübe Hasta Sayısı"]), max(dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"])))
+
+    plot.new()
+    plot(1, type="n", xlab="Gün", ylab="Sayı", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+         main = "Toplam Resmi Yoğun Bakım ve Entübe Hasta Sayısı")
+    
+    lines(seq(1:nrow(dataset())), dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"], lwd=2, col = "red", xlab = "Time (s)",
+          ylab = "Counts")
+    
+    
+    lines(seq(1:nrow(dataset())), dataset()[,"Toplam Entübe Hasta Sayısı"], lwd=2, col = "blue", xlab = "Time (s)",
+          ylab = "Counts")
+    
+    
+    legend("topleft", legend=c("Yoğun Bakım","Entübe"),
+           col=c("red", "blue"), lty=1)
+    
+    
+    
+  })
   
   ##### Günlük Yeni Vakalar ####
   
@@ -523,7 +646,7 @@ server <- function(input, output, session) {
   
   ##### Ülke Karşılaştırma ####
   
-
+  #### Ülke verileri ##### 
   comparedCountries <- reactive({
     
     comparedCountries = input$countries
@@ -537,6 +660,7 @@ server <- function(input, output, session) {
     
   })
   
+  #### Ülke tablosu ##### 
   output$countryTable <- DT::renderDataTable({
     
 
@@ -564,19 +688,23 @@ server <- function(input, output, session) {
     
   })
   
+  #### Ülke vaka karşılaştırması ##### 
   output$compareConfirmed <- renderPlot({
-    
-    if(input$compare){
-      
-      compareData = comparedCountries()
+    options(scipen=999)
+  compareData = comparedCountries()
       
             splitCompareData = split(compareData, compareData$Country)
 
             for(counts in 1:length(unique(compareData$Country))){
 
               if(max(splitCompareData[[counts]]$Confirmed) > input$firstCase){
-              splitCompareData[[counts]] = dplyr::filter(splitCompareData[[counts]], splitCompareData[[counts]]$Confirmed >= input$firstCase)
-              splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+                tmp = splitCompareData[[counts]]
+                tmp2 = dplyr::filter(tmp, tmp$Confirmed >= input$firstCase)
+                indx = which(splitCompareData[[counts]]$Date == tmp2$Date[1])-1
+                splitCompareData[[counts]] = splitCompareData[[counts]][indx:nrow(splitCompareData[[counts]]),]
+                # splitCompareData[[counts]]$Confirmed[[1]]  = input$firstCase
+                splitCompareData[[counts]]$logConfirmed[[1]] = log(input$firstCase)
+                splitCompareData[[counts]]$Days = 0:(nrow(data.frame(splitCompareData[[counts]]))-1)
               }else{
                 
                 splitCompareData[[counts]] = NA
@@ -587,7 +715,7 @@ server <- function(input, output, session) {
             na.omit.list <- function(y) { return(y[!sapply(y, function(x) all(is.na(x)))]) }
             compareData = rbindlist(na.omit.list(splitCompareData))      
             
-            # }
+                        
             
             if(input$firstCase > 0){
               xlabel = paste0(input$firstCase,". Vaka Tespit Edildikten Sonra Geçen Gün")
@@ -605,10 +733,7 @@ server <- function(input, output, session) {
               }
             }
         
-      if(!input$logTransform){      
-      population = FALSE
-      if(!population){
-        
+            
         yValues = seq(input$firstCase,(max(compareData$Confirmed)+max(compareData$Confirmed)/8),(max(compareData$Confirmed)-input$firstCase)/5)
         roundValue = 5000
         if(max(yValues) <= 100){
@@ -645,61 +770,110 @@ server <- function(input, output, session) {
         
         
         yValues = c(yValues[[1]],round.choose(yValues[-1]-yValues[[1]], roundTo = roundValue, 1))
+    
+        transform = ifelse(input$logTransform,"log", "identity")
+        gtitle = ifelse(input$logTransform,"Ülkelerin Toplam Resmi Vaka Sayıları (Log)", "Ülkelerin Toplam Resmi Vaka Sayıları")
         
         
+        if(input$logTransform){
+          
+          breakPoints = c(input$firstCase,input$firstCase+input$firstCase, input$firstCase+input$firstCase*4,
+          input$firstCase+input$firstCase*9,input$firstCase+input$firstCase*19,input$firstCase+input$firstCase*49
+          ,input$firstCase+input$firstCase*99,input$firstCase+input$firstCase*199,input$firstCase+input$firstCase*499
+          ,input$firstCase+input$firstCase*999)
+          
+          }else{
+            
+            breakPoints = waiver()
+            
+          }
         
-        ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam Vaka") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Vaka Sayıları")+
+        
+      p = ggplot(data = compareData, aes(x=Days, y=Confirmed)) + geom_line(aes(colour=Country),size = 1) +
+          geom_point(aes(colour=Country), size=2) + ylab("Toplam Vaka") + xlab(xlabel)+
+          scale_colour_discrete("Ülke")+ ggtitle(gtitle)+
           theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom") +
-          scale_y_continuous(breaks = yValues, 
-                             limits = c(input$firstCase,(max(compareData$Confirmed)+max(compareData$Confirmed)/8)))
+          theme(legend.position="bottom") +scale_y_continuous(trans = transform,
+                                                              breaks = breakPoints,
+                                                               limits = c(min(compareData$Confirmed),max(compareData$Confirmed)))
+        
+        
+      if(input$trajectory){
+        d = (input$firstCase)*2^(1:max(compareData$Days))
+        d = c(input$firstCase, d[1:max(compareData$Days)])
+        
+        doublingEveryDay =  cbind.data.frame(Country = rep("2'ye katlanma (her gün)", length(d)), Confirmed = d, 
+                                             Days = 0:(length(d)-1))
+        
+        
+        d2 = (input$firstCase)*1.4142137^(1:max(compareData$Days))
+        d2 = c(input$firstCase, d2[1:max(compareData$Days)])
+        
+        doublingEveryTwoDays =  cbind.data.frame(Country = rep("2'ye katlanma (2 günde bir)", length(d2)), Confirmed = d2, 
+                                                 Days = 0:(length(d2)-1))
+        
+        
+        d3 = (input$firstCase)*1.259921^(1:max(compareData$Days))
+        d3 = c(input$firstCase, d3[1:max(compareData$Days)])
+        
+        doublingEveryThreeDays =  cbind.data.frame(Country = rep("2'ye katlanma (3 günde bir)", length(d3)), Confirmed = d3, 
+                                                   Days = 0:(length(d3)-1))
+        
+        
+        d7 = (input$firstCase)*1.10408955^(1:max(compareData$Days))
+        d7 = c(input$firstCase, d7[1:max(compareData$Days)])
+        
+        doublingEveryWeek =  cbind.data.frame(Country = rep("2'ye katlanma (haftada bir)", length(d7)), Confirmed = d7, 
+                                              Days = 0:(length(d7)-1))
         
         
         
+        doublingData = plyr::rbind.fill(doublingEveryDay, doublingEveryTwoDays,doublingEveryThreeDays, doublingEveryWeek)
+        
+        
+        p2 = p + geom_line(data =doublingData, aes(y=Confirmed, fill=Country),size=1, linetype="dashed") 
+        
+        
+        pg <- ggplot_build(p2)
+        coordinates = pg$data[[3]]
+        
+        splitCoordinates = split(coordinates,coordinates$group)
+        
+        coordinateValues = matrix(NA,nrow=4,ncol=2)
+        
+        
+        for(coord in 1:length(splitCoordinates)){
+          
+          df = splitCoordinates[[coord]][-9]
+          df2 = df[complete.cases(df),]
+          
+          coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
+          coordinateValues[coord,2] = max(df2$x)
+          
+        }
+        
+        
+        p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
+                      color="black")+ 
+          annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
+                   color="black")+
+          annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
+                   color="black")+
+          annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
+                   color="black")
       }else{
         
-   
-        
-        ggplot(data = compareData, aes(x=Days, y=popAdjustedCase)) + geom_line(aes(colour=Country),size = 1) +
-          xlab("Gün") + ylab("Toplam Vaka (Milyonda)") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Vaka Sayıları(Milyonda)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom")
+        p
         
       }
         
-      }else{
-        
-        firstCase = input$firstCase
-        if(input$firstCase < 1){firstCase = 0.5}
-        
-        yValues = seq(log(firstCase),(max(compareData$logConfirmed, na.rm = T)+max(compareData$logConfirmed, na.rm = T)/8),(max(compareData$logConfirmed, na.rm = T)-log(firstCase))/5)
-        br = round(seq(min(yValues),max(yValues),2))
-        yValues = round(exp(br),0)
-        
-        yValues2 = c(round.choose(yValues[[1]], roundTo = 10, 0),round.choose(yValues[-1]-yValues[[1]], roundTo = 10, 1))
-        
-        
-        ggplot(data = compareData, aes(x=Days, y=logConfirmed)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam Vaka") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Vaka Sayıları (Logaritmik Ölçek)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom") + 
-          scale_y_continuous(breaks = br,labels= yValues2)
-        
-      }
-      
-    
-    }
-    
-    
+            
   })
   
+  #### Ülke ölüm karşılaştırması ##### 
   output$compareDeaths <- renderPlot({
     
-    if(input$compare){
+    
       
       compareData = comparedCountries()
       
@@ -708,8 +882,15 @@ server <- function(input, output, session) {
       for(counts in 1:length(unique(compareData$Country))){
         
         if(max(splitCompareData[[counts]]$Deaths) > input$firstDeath){
-          splitCompareData[[counts]] = dplyr::filter(splitCompareData[[counts]], splitCompareData[[counts]]$Deaths >= input$firstDeath)
-          splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+          
+          tmp = splitCompareData[[counts]]
+          tmp2 = dplyr::filter(tmp, tmp$Deaths >= input$firstDeath)
+          indx = which(splitCompareData[[counts]]$Date == tmp2$Date[1])-1
+          splitCompareData[[counts]] = splitCompareData[[counts]][indx:nrow(splitCompareData[[counts]]),]
+          # splitCompareData[[counts]]$Deaths[[1]]  = input$firstDeath
+          splitCompareData[[counts]]$logDeaths[[1]] = log(input$firstDeath)
+          splitCompareData[[counts]]$Days = 0:(nrow(data.frame(splitCompareData[[counts]]))-1)
+  
         }else{
           
           splitCompareData[[counts]] = NA
@@ -718,7 +899,10 @@ server <- function(input, output, session) {
       }
       
       na.omit.list <- function(y) { return(y[!sapply(y, function(x) all(is.na(x)))]) }
-      compareData = rbindlist(na.omit.list(splitCompareData))      
+      compareData = rbindlist(na.omit.list(splitCompareData))  
+      
+      
+      
       
       round.choose <- function(x, roundTo, dir = 1) {
         if(dir == 1) {  ##ROUND UP
@@ -737,13 +921,8 @@ server <- function(input, output, session) {
       }
       
       # }
-      if(!input$logTransform){
-      population = FALSE
-      if(!population){
-        
-
-
-        
+      
+      
         yValues = seq(input$firstDeath,(max(compareData$Deaths)+max(compareData$Deaths)/8),
                       (max(compareData$Deaths)-input$firstDeath)/5)
         
@@ -782,57 +961,117 @@ server <- function(input, output, session) {
         
         yValues = c(yValues[[1]],round.choose(yValues[-1]-yValues[[1]], roundTo = roundValue, 1))
         
+        transform = ifelse(input$logTransform,"log", "identity")
+        gtitle = ifelse(input$logTransform,"Ülkelerin Toplam Resmi Ölüm Sayıları (Log)", "Ülkelerin Toplam Resmi Ölüm Sayıları")
         
         
-        ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam Ölüm") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Ölüm Sayıları")+
+        if(input$logTransform){
+          
+          breakPoints = c(input$firstDeath,input$firstDeath+input$firstDeath, input$firstDeath+input$firstDeath*4,
+                          input$firstDeath+input$firstDeath*9,input$firstDeath+input$firstDeath*19,input$firstDeath+input$firstDeath*49
+                          ,input$firstDeath+input$firstDeath*99,input$firstDeath+input$firstDeath*199,input$firstDeath+input$firstDeath*499
+                          ,input$firstDeath+input$firstDeath*999)
+          
+        }else{
+          
+          breakPoints = waiver()
+          
+        }
+        
+      p =  ggplot(data = compareData, aes(x=Days, y=Deaths)) + geom_line(aes(colour=Country),size = 1) +
+          geom_point(aes(colour=Country), size=2) +xlab(xlabel) + ylab("Toplam Ölüm") + 
+          scale_colour_discrete("Ülke")+ ggtitle(gtitle)+
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom") +
-          scale_y_continuous(breaks = yValues, 
-                             limits = c(input$firstDeath,(max(compareData$Deaths)+max(compareData$Deaths)/8)))
+          scale_y_continuous(trans = transform, breaks = breakPoints,
+                             limits = c(min(compareData$Deaths),max(compareData$Deaths)))
         
         
         
-      }else{
+      
+      if(input$trajectory){
+      
+      d = (input$firstDeath)*2^(1:max(compareData$Days))
+      d = c(input$firstDeath, d[1:max(compareData$Days)])
+      
+      doublingEveryDay =  cbind.data.frame(Country = rep("2'ye katlanma (her gün)", length(d)), Confirmed = d, 
+                                           Days = 0:(length(d)-1))
+      
+      
+      d2 = (input$firstDeath)*1.4142137^(1:max(compareData$Days))
+      d2 = c(input$firstDeath, d2[1:max(compareData$Days)])
+      
+      doublingEveryTwoDays =  cbind.data.frame(Country = rep("2'ye katlanma (2 günde bir)", length(d2)), Confirmed = d2, 
+                                               Days = 0:(length(d2)-1))
+      
+      
+      d3 = (input$firstDeath)*1.259921^(1:max(compareData$Days))
+      d3 = c(input$firstDeath, d3[1:max(compareData$Days)])
+      
+      doublingEveryThreeDays =  cbind.data.frame(Country = rep("2'ye katlanma (3 günde bir)", length(d3)), Confirmed = d3, 
+                                                 Days = 0:(length(d3)-1))
+      
+      
+      d7 = (input$firstDeath)*1.10408955^(1:max(compareData$Days))
+      d7 = c(input$firstDeath, d7[1:max(compareData$Days)])
+      
+      doublingEveryWeek =  cbind.data.frame(Country = rep("2'ye katlanma (haftada bir)", length(d7)), Confirmed = d7, 
+                                            Days = 0:(length(d7)-1))
+      
+      
+      
+      doublingData = plyr::rbind.fill(doublingEveryDay, doublingEveryTwoDays,doublingEveryThreeDays, doublingEveryWeek)
+      
+      
+      p2 = p + geom_line(data =doublingData, aes(y=Confirmed, fill=Country),size=1, linetype="dashed") 
+      
+      
+      pg <- ggplot_build(p2)
+      coordinates = pg$data[[3]]
+      
+      splitCoordinates = split(coordinates,coordinates$group)
+      
+      coordinateValues = matrix(NA,nrow=4,ncol=2)
+      
+      
+      for(coord in 1:length(splitCoordinates)){
         
-        ggplot(data = compareData, aes(x=Days, y=popAdjustedCase)) + geom_line(aes(colour=Country),size = 1) +
-          xlab("Gün") + ylab("Toplam Ölüm (Milyonda)") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Ölüm Sayıları(Milyonda)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom")
+        df = splitCoordinates[[coord]][-9]
+        df2 = df[complete.cases(df),]
         
-      }}else{
-        
-        
-        firstDeath = input$firstDeath
-        if(input$firstDeath < 1){firstDeath = 0.5}
-        
-        yValues = seq(log(firstDeath),(max(compareData$logDeaths, na.rm = T)+max(compareData$logDeaths, na.rm = T)/8),(max(compareData$logDeaths, na.rm = T)-log(firstDeath))/5)
-        br = round(seq(min(yValues),max(yValues),2))
-        yValues = round(exp(br),0)
-        
-        yValues2 = c(round.choose(yValues[[1]], roundTo = 10, 0),round.choose(yValues[-1]-yValues[[1]], roundTo = 10, 1))
-        
-        
-        ggplot(data = compareData, aes(x=Days, y=logDeaths)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam Ölüm") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi Ölüm Sayıları (Logaritmik Ölçek)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom") + 
-          scale_y_continuous(breaks = br,labels= yValues2)
+        coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
+        coordinateValues[coord,2] = max(df2$x)
         
       }
       
       
-    }
+      p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
+                    color="black")+ 
+        annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
+                 color="black")+
+        annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
+                 color="black")+
+        annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
+                 color="black")
+      
+      
+      }else{
+        
+        
+        p
+      }
+      
+    
+      
+    
     
     
   })
   
+  #### Ülke iyileşme karşılaştırması ##### 
   output$compareRecovered <- renderPlot({
     
-    if(input$compare){
+    
       
       compareData = comparedCountries()
       
@@ -841,8 +1080,15 @@ server <- function(input, output, session) {
       for(counts in 1:length(unique(compareData$Country))){
         
         if(max(splitCompareData[[counts]]$Recovered) > input$firstRecover){
-          splitCompareData[[counts]] = dplyr::filter(splitCompareData[[counts]], splitCompareData[[counts]]$Recovered >= input$firstRecover)
-          splitCompareData[[counts]]$Days = 1:nrow(data.frame(splitCompareData[[counts]]))
+          
+          tmp = splitCompareData[[counts]]
+          tmp2 = dplyr::filter(tmp, tmp$Recovered >= input$firstRecover)
+          indx = which(splitCompareData[[counts]]$Date == tmp2$Date[1])-1
+          splitCompareData[[counts]] = splitCompareData[[counts]][indx:nrow(splitCompareData[[counts]]),]
+          # splitCompareData[[counts]]$Recovered[[1]]  = input$firstRecover
+          splitCompareData[[counts]]$logConfirmed[[1]] = log(input$firstRecover)
+          splitCompareData[[counts]]$Days = 0:(nrow(data.frame(splitCompareData[[counts]]))-1)
+         
         }else{
           
           splitCompareData[[counts]] = NA
@@ -869,11 +1115,7 @@ server <- function(input, output, session) {
       }
       
       # }
-      if(!input$logTransform){
-      population = FALSE
-      if(!population){
-        
-
+      
         yValues = seq(input$firstRecover,(max(compareData$Recovered)+max(compareData$Recovered)/8),
                       (max(compareData$Recovered)-input$firstRecover)/5)
         
@@ -912,55 +1154,151 @@ server <- function(input, output, session) {
         
         yValues = c(yValues[[1]],round.choose(yValues[-1]-yValues[[1]], roundTo = roundValue, 1))
         
+        transform = ifelse(input$logTransform,"log", "identity")
+        gtitle = ifelse(input$logTransform,"Ülkelerin Toplam Resmi İyileşme Sayıları (Log)", "Ülkelerin Toplam Resmi İyileşme Sayıları")
         
-        
-        ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam İyileşme") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi İyileşme Sayıları")+
+        if(input$logTransform){
+          
+          breakPoints = c(input$firstRecover,input$firstRecover+input$firstRecover, input$firstRecover+input$firstRecover*4,
+                          input$firstRecover+input$firstRecover*9,input$firstRecover+input$firstRecover*19,input$firstRecover+input$firstRecover*49
+                          ,input$firstRecover+input$firstRecover*99,input$firstRecover+input$firstRecover*199,input$firstRecover+input$firstRecover*499
+                          ,input$firstRecover+input$firstRecover*999,input$firstRecover+input$firstRecover*1999
+                        
+                          )
+          
+        }else{
+          
+          breakPoints = waiver()
+          
+        }
+
+       p =  ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1) +
+          geom_point(aes(colour=Country), size=2) +  xlab(xlabel) + ylab("Toplam İyileşme") + 
+          scale_colour_discrete("Ülke")+ ggtitle(gtitle)+
           theme(text = element_text(size=14),legend.title=element_blank())+ 
           theme(legend.position="bottom") +
-          scale_y_continuous(breaks = yValues, 
-                             limits = c(input$firstRecover,(max(compareData$Recovered)+max(compareData$Recovered)/8)))
+          scale_y_continuous(trans = transform, breaks = breakPoints,
+                             limits = c(input$firstRecover,max(compareData$Recovered)))
         
-        
-        
-      }else{
-        
-        ggplot(data = compareData, aes(x=Days, y=popAdjustedCase)) + geom_line(aes(colour=Country),size = 1) +
-          xlab("Gün") + ylab("Toplam İyileşme (Milyonda)") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi İyileşme Sayıları(Milyonda)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom")
-        
-      }}else{
-        
-        
-        firstRecover = input$firstRecover
-        if(input$firstRecover < 1){firstRecover = 0.5}
-        
-        yValues = seq(log(firstRecover),(max(compareData$logRecovered, na.rm = T)+max(compareData$logRecovered, na.rm = T)/8),(max(compareData$logRecovered, na.rm = T)-log(firstRecover))/5)
-        br = round(seq(min(yValues),max(yValues),2))
-        yValues = round(exp(br),0)
-        
-        yValues2 = c(round.choose(yValues[[1]], roundTo = 10, 0),round.choose(yValues[-1]-yValues[[1]], roundTo = 10, 1))
-        
-        
-        
-        ggplot(data = compareData, aes(x=Days, y=logRecovered)) + geom_line(aes(colour=Country),size = 1) +
-          xlab(xlabel) + ylab("Toplam İyileşme") + 
-          scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Toplam Resmi İyileşme Sayıları (Logaritmik Ölçek)")+
-          theme(text = element_text(size=14),legend.title=element_blank())+ 
-          theme(legend.position="bottom")  + 
-          scale_y_continuous(breaks = br,labels= yValues2)
-        
-      }
+       
+       if(input$trajectory){
+       d = (input$firstRecover)*2^(1:max(compareData$Days))
+       d = c(input$firstRecover, d[1:max(compareData$Days)])
+       
+       doublingEveryDay =  cbind.data.frame(Country = rep("2'ye katlanma (her gün)", length(d)), Confirmed = d, 
+                                            Days = 0:(length(d)-1))
+       
+       
+       d2 = (input$firstRecover)*1.4142137^(1:max(compareData$Days))
+       d2 = c(input$firstRecover, d2[1:max(compareData$Days)])
+       
+       doublingEveryTwoDays =  cbind.data.frame(Country = rep("2'ye katlanma (2 günde bir)", length(d2)), Confirmed = d2, 
+                                                Days = 0:(length(d2)-1))
+       
+       
+       d3 = (input$firstRecover)*1.259921^(1:max(compareData$Days))
+       d3 = c(input$firstRecover, d3[1:max(compareData$Days)])
+       
+       doublingEveryThreeDays =  cbind.data.frame(Country = rep("2'ye katlanma (3 günde bir)", length(d3)), Confirmed = d3, 
+                                                  Days = 0:(length(d3)-1))
+       
+       
+       d7 = (input$firstRecover)*1.10408955^(1:max(compareData$Days))
+       d7 = c(input$firstRecover, d7[1:max(compareData$Days)])
+       
+       doublingEveryWeek =  cbind.data.frame(Country = rep("2'ye katlanma (haftada bir)", length(d7)), Confirmed = d7, 
+                                             Days = 0:(length(d7)-1))
+       
+       
+       
+       doublingData = plyr::rbind.fill(doublingEveryDay, doublingEveryTwoDays,doublingEveryThreeDays, doublingEveryWeek)
+       
+       
+       p2 = p + geom_line(data =doublingData, aes(y=Confirmed, fill=Country),size=1, linetype="dashed") 
+       
+       
+       pg <- ggplot_build(p2)
+       coordinates = pg$data[[3]]
+       
+       splitCoordinates = split(coordinates,coordinates$group)
+       
+       coordinateValues = matrix(NA,nrow=4,ncol=2)
+       
+       
+       for(coord in 1:length(splitCoordinates)){
+         
+         df = splitCoordinates[[coord]][-9]
+         df2 = df[complete.cases(df),]
+         
+         coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
+         coordinateValues[coord,2] = max(df2$x)
+         
+       }
+       
+       
+       p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
+                     color="black")+ 
+         annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
+                  color="black")+
+         annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
+                  color="black")+
+         annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
+                  color="black")
+       
+       
+       }else{
+         
+         p
+         
+       }
       
       
-    }
+      
+
+  })
+  
+  #### Ülke test karşılaştırması ##### 
+  output$testComparisonPlot <- renderPlot({
+    
+    ggplot(dataTest(), aes(x=Tests, y=Positive)) +
+      geom_point() + 
+      ggrepel::geom_text_repel(aes(label = Country))+
+      xlab("Test Sayısı") + ylab("Vaka Sayısı")+
+      scale_y_continuous(breaks = seq(0,175000,25000))+
+      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Test Sayıları ve Vaka Sayıları")+
+      theme(text = element_text(size=14),legend.title=element_blank())
     
     
   })
   
+  #### Ülke milyon nüfusta test karşılaştırması ##### 
+  output$testComparisonPopAdjustedPlot <- renderPlot({
+    
+    ggplot(dataTest(), aes(x=Test_million_population, y=Positive)) +
+      geom_point() + 
+      ggrepel::geom_text_repel(aes(label = Country))+
+      xlab("Test Sayısı/1 Milyon Nüfus") + ylab("Vaka Sayısı")+
+      scale_y_continuous(breaks = seq(0,175000,25000))+
+      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin 1 Milyon Nüfusta Test Sayıları ve Vaka Sayıları")+
+      theme(text = element_text(size=14),legend.title=element_blank())
+    
+    
+    
+  })
+  
+  #### Ülkelerin normalize edilmiş test/vaka karşılaştırması ##### 
+  output$testComparisonPopTestAdjustedPlot <- renderPlot({
+    
+    ggplot(dataTest(), aes(x=Test_million_population, y=Positive_Thousand_Test)) +
+      geom_point() + 
+      ggrepel::geom_text_repel(aes(label = Country))+
+      xlab("Test Sayısı/1 Milyon Nüfus") + ylab("Vaka Sayısı/Bin Test")+
+      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Test Sayısı ve Vaka Sayısı Karşılaştırması")+
+      theme(text = element_text(size=14),legend.title=element_blank())
+    
+    
+    
+  })
   
   output$table1 <- renderText({
     
