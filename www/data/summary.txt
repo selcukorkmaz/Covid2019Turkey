@@ -1,2 +1,2 @@
 Toplam Vaka	Toplam Ölüm	Toplam İyileşen Vaka	Toplam Aktif Vaka	Ölüm Oranı (%)	Toplam Test	Toplam Vaka (Milyonda)	Test Sayısı (Milyonda)	Vaka Sayısı (Bin Test)
-15679	277	333	15069	1.77	106799	186	1266	147
+38226	812	1846	35568	2.12	247768	453	2938	154

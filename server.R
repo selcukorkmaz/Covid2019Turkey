@@ -5,20 +5,29 @@ library(plyr)
 library(dplyr)
 library(tidyr)
 library(gghighlight)
-source("worldData.R")
-
+library(plotly)
+library(shinyjs)
+source("worldData2.R")
+source("underReporting.R")
 
 server <- function(input, output, session) {
 
-
+  # Simulate work being done for 1 second
+  Sys.sleep(1)
+  
+  
+  # Hide the loading message when the rest of the server function has executed
+  hide(id = "loading-content", anim = TRUE, animType = "fade")    
+  show("app-content")
+  
   #### Veri yükleme ####
 
   #### Dünya verileri ####
   dataWorld <-reactive({
     
-    url = "https://raw.githubusercontent.com/datasets/covid-19/master/data/time-series-19-covid-combined.csv"
+    # url = "https://raw.githubusercontent.com/datasets/covid-19/master/data/time-series-19-covid-combined.csv"
     filter = input$filter
-    worldData(url, filter)
+    worldData2(filter)
     
   })
 
@@ -33,7 +42,9 @@ server <- function(input, output, session) {
 
 
 
-      updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = c("Turkey", "Germany", "Italy", "Spain","France","Iran", "US", "China"))
+  updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = c("Turkey",
+    "Germany", "Italy", "Spain","France","Iran", "US", "China", "United Kingdom", "Korea, South", 
+    "Switzerland", "Austira", "Belgium", "Canada", "Netherlands"))
 
 
   })
@@ -55,7 +66,8 @@ server <- function(input, output, session) {
     colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm",
                        "Toplam İyileşme", "Yeni İyileşme",  "Toplam Yoğun Bakım Hasta Sayısı",
                        "Toplam Entübe Hasta Sayısı", "Toplam Test", "Yeni Test", "Test Sayısı (Milyonda)",
-                       "Tespit Edilen Vaka Sayısı (Bin Test)","Vaka Değişim Oranı (%)", "Yeni Vaka Tespit Etme Oranı (%)", "Time")
+                       "Tespit Edilen Vaka Sayısı (Bin Test)", "Toplam Vaka (Milyonda)", "Vaka Değişim Oranı (%)", 
+                       "Yeni Vaka Tespit Etme Oranı (%)", "Time")
     return(data)
 
   })
@@ -74,69 +86,149 @@ server <- function(input, output, session) {
 
   #### Dünya Test verileri ####
   dataTest <- reactive({
-
+    
     test = read.table("www/data/tests.txt", header=FALSE, comment.char="#",
                       na.strings=".", stringsAsFactors=FALSE,
                       quote="", fill=TRUE, sep = "\t")
-
+    
     colnames(test) = c("Country", "Tests", "Positive", "Date", "Test_million_population", "Positive_Thousand_Test", "Ref")
-
+    
     head(test)
     test$Country
-
+    
     splitTest = split(test, test$Country)
     testCountries = list()
-
+    
     for(i in 1:length(splitTest)){
-
+      
       df = splitTest[i]
-
+      
       if(grepl(":", names(df))){
-
+        
         df = NULL
-
-
+        
+        
       }
-
+      
       else if(grepl("\\(", names(df))){
-
+        
         df[[1]]$Country =  gsub("\\(.*","",names(df))
       }
-
+      
       testCountries[i] = df
     }
-
-
+    
+    
     combinedTestCountries = data.table::rbindlist(testCountries)
-
+    
     combinedTestCountries = combinedTestCountries[complete.cases(combinedTestCountries),]
-
-    testCompared = c(" Australia", " Canada", " Denmark", " Italy", " Japan", " Norway",
-                     " Portugal", " South Korea", " Switzerland"," Turkey",
-                     " United Kingdom", " United States ", " Finland"," Poland"
-    )
-    plotData = combinedTestCountries[combinedTestCountries$Country %in% testCompared,]
-    plotData[plotData$Date %in% c("29 Mar", "30 Mar", "31 Mar"), ]
+    
+    plotData = dplyr::filter(combinedTestCountries, combinedTestCountries$Positive >=10000)
+    
+    plotData= plotData[plotData$Date %in% c("4 Apr", "5 Apr", "6 Apr", "7 Apr"), ]
+    plotData= plotData[!(plotData$Country %in% c("  California", "  Emilia-Romagna", "  Florida", "  Illinois",
+                                                 "  Lombardy" , "  Louisiana", "  Michigan",
+                                                 "  New Jersey", "  New York","  Piedmont" ,
+                                                 "  Veneto")), ]
+    
     return(plotData)
-
+    
+    
   })
 
+####### DASHBOARDS ###########
+  output$totalCase <- renderUI({
+    
+    infoBox(
+      "TOPLAM VAKA", summaryData()[1,1], icon = icon("hospital-symbol"), color = "yellow",
+      fill = TRUE
+    )
+    
+    })
+  
+  output$totalDeath <- renderUI({
+    
+    infoBox(
+      "TOPLAM ÖLÜM", summaryData()[1,2], icon = icon("feather"), color = "red",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalRecovered <- renderUI({
+    
+    infoBox(
+      "TOPLAM İYİLEŞEN", summaryData()[1,3], icon = icon("check"), color = "green",
+      fill = TRUE
+    )
+    
+  })
+  
+  
+  output$totalActiveCases <- renderUI({
+    
+    infoBox(
+      "TOPLAM AKTİF VAKA", summaryData()[1,4], icon = icon("thermometer"), color = "yellow",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$deathRate <- renderUI({
+    
+    infoBox(
+      "ÖLÜM ORANI (%)", summaryData()[1,5], icon = icon("percentage"), color = "red",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalTest <- renderUI({
+    
+    infoBox(
+      "TOPLAM TEST", summaryData()[1,6], icon = icon("microscope"), color = "green",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalCaseMillion <- renderUI({
+    
+    infoBox(
+      "TOPLAM VAKA (MİLYONDA)", summaryData()[1,7], icon = icon("sort-numeric-up"), color = "yellow",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalCaseThousandTest <- renderUI({
+    
+    infoBox(
+      "VAKA SAYISI (BİN TEST)", summaryData()[1,9], icon = icon("sort-numeric-up"), color = "red",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalTesMillion <- renderUI({
+
+    infoBox(
+      "TEST SAYISI (MİLYONDA)", summaryData()[1,8], icon = icon("sort-numeric-up"), color = "green",
+      fill = TRUE
+    )
+    
+  })
+  
+  
   #### Tablo ####
   result <- reactive({
 
-    if(input$dataset == 'Özet'){
-
-      res = summaryData()
-
-    }
-
     if(input$dataset == 'Tüm'){
 
-      res <- dataset()[-ncol(dataset())]
-
+      dataset()[-ncol(dataset())]
+      
     }
 
-    return(res)
 
   })
 
@@ -144,21 +236,73 @@ server <- function(input, output, session) {
   output$resultTable <- DT::renderDataTable({
 
 
-    datatable(result(), extensions = c('Buttons','KeyTable', 'Responsive'), rownames= FALSE,options = list(pageLength = 100,
+    datatable(result(), extensions = c('Buttons','KeyTable', 'Responsive'), rownames= FALSE,options = list(columnDefs = list(list(className = 'dt-center',targets='_all')),pageLength = 100,
       info = FALSE,bFilter = FALSE, paging = FALSE, dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),
                                                           text = 'İndir')), keys = TRUE
     ))
 
   })
 
+  output$dimension <- renderPrint({
+    
+    cbind.data.frame(input$dimension[1], input$dimension[2])
+  })
+  
   #### Türkiye haritası #####
-  output$frame <- renderUI({
-    my_test <- tags$iframe(src="https://flo.uri.sh/visualisation/1772673/embed?auto=1", width= "100%",
-                           height= "650px", id = 'myIframe',frameborder=0,
-                           scrolling = 'yes')
-    tags$script(HTML("iFrameResize({ log: true }, '#myIframe')"))
-    print(my_test)
-    my_test
+  output$turkeyMap <- renderUI({
+  
+    if(input$dimension < 550){
+      
+      h = input$dimension/2
+      
+    }else{
+      
+      h = input$dimension/2.5
+      
+    }
+    
+    
+    tags$iframe(src="https://infogram.com/turkiye-koronavirus-vaka-sayilari-haritasi-1h7z2lgw10qx4ow", 
+                width = "100%", height = h, 
+                allowfullscreen="allowfullscreen",
+                id = 'myIframe',frameborder=0,
+                scrolling = 'yes')
+    
+  
+    
+    # <div class="infogram-embed" data-id="ee5d83f0-3c42-4112-a103-162b3770c9cd" 
+    # data-type="interactive" data-title="Türkiye koronavirüs vaka sayıları haritası"></div><script>
+    #   !function(e,i,n,s){var t="InfogramEmbeds",d=e.getElementsByTagName("script")[0];
+    #   if(window[t]&&window[t].initialized)window[t].process&&window[t].process();
+    #   else if(!e.getElementById(n)){var o=e.createElement("script");o.async=1,o.id=n,
+    #   o.src="https://e.infogram.com/js/dist/embed-loader-min.js",d.parentNode.insertBefore(o,d)}}
+    # (document,0,"infogram-async");
+    # 
+    # </script>
+    
+  })
+  
+  #### Dünya haritası #####
+  output$worldMap <- renderUI({
+    
+    if(input$dimension < 550){
+      
+      h = input$dimension/2
+      
+    }else{
+      
+      h = input$dimension/2.5
+      
+    }
+  
+    
+    tags$iframe(src="https://www.arcgis.com/apps/Embed/index.html?webmap=14aa9e5660cf42b5b4b546dec6ceec7c&extent=&zoom=true&previewImage=false&scale=true&disable_scroll=true&theme=light", 
+                width = "100%", height = h, 
+                allowfullscreen="allowfullscreen",
+                id = 'myIframe2',frameborder=0,
+                scrolling = 'no')
+    
+    
   })
   
   #### Üstel model ####
@@ -188,132 +332,137 @@ server <- function(input, output, session) {
 
   ##### Toplam Vaka Grafiği ####
 
-  output$plotTotalCases <- renderPlot({
-    expModelPlot=FALSE
+  output$plotTotalCases <- renderPlotly({
+    # expModelPlot=FALSE
     
-    if(!expModelPlot){
+    
 
-    xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(dataset()[,"Toplam Vaka"], na.rm = TRUE))
-    legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], na.rm = TRUE)
+    # xlimit = c(1, nrow(dataset()))
+    # ylimit = c(1,max(dataset()[,"Toplam Vaka"], na.rm = TRUE))
+    # legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], na.rm = TRUE)
+    # 
+    # plot.new()
+    # plot(1, xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+    #      main = "Toplam Resmi COVID-19 Vakaları")
+    # 
+    # lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
+    #       ylab = "Counts")
+    # 
+    # legend("topleft", legend=c("Vaka"),
+    #        col=c("blue"), lty=1)
 
-    plot.new()
-    plot(1, xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Toplam Resmi COVID-19 Vakaları")
+ 
+    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam Vaka"], type = 'scatter', name = "Vaka", mode = 'lines+markers')
+    
+    fig %>% layout(title = "<b>Toplam Resmi COVID-19 Vakaları</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Toplam Vaka"), showlegend = TRUE, autosize = TRUE,
+                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
 
-    lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
-          ylab = "Counts")
-
-    legend("topleft", legend=c("Vaka"),
-           col=c("blue"), lty=1)
-
-    # if(input$totalDeaths){
-    #
-    #     lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
-    #           ylab = "Counts")
-    #
-    #
-    #     legend(1, legendPosition, legend=c("Vaka","Ölüm"),
-    #            col=c("blue", "violet"), lty=1)
-    #
+    # if(expModelPlot){
+    # 
+    # 
+    #   times <- seq(1,nrow(dataset()), 1)
+    #   predictions <- exp(predict(exponentialModel(),
+    #                              list(x=times),interval = "confidence"))
+    # 
+    #   xlimit = c(1, max(nrow(dataset()), max(times, na.rm = TRUE), na.rm = TRUE))
+    #   ylimit = c(1,max(max(predictions[,"fit"], na.rm = TRUE), max(dataset()[,"Toplam Vaka"], na.rm = TRUE), na.rm = TRUE))
+    # 
+    #   plot.new()
+    #   plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+    #        main = "Toplam Resmi COVID-19 Vakaları")
+    # 
+    #   lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
+    #         ylab = "Counts")
+    # 
+    #   lines(type="o",times[8:nrow(dataset())], predictions[,"fit"], lwd=2, col = "red", xlab = "Time (s)",
+    #         ylab = "Counts")
+    # 
+    # 
+    #     # lines(times[8:nrow(dataset())], predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
+    #     #       ylab = "Counts")
+    #     #
+    #     # lines(times[8:nrow(dataset())], predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
+    #     #       ylab = "Counts")
+    #     #
+    # 
+    # 
+    #     # legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"fit"]))
+    # 
+    #     legend("topleft", legend=c("Vaka", "Üstel model"),
+    #            col=c("blue", "red"), lty=1)
+    # 
+    # 
+    # 
+    #   # if(input$totalDeaths){
+    #   #
+    #   #   lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
+    #   #         ylab = "Counts")
+    #   #
+    #   #
+    #   #   # legend(1, legendPosition, legend=c("Vaka","Ölüm", "Üstel model"),
+    #   #   #        col=c("blue", "violet", "red"), lty=1)
+    #   #
+    #   #   if(input$addCI){
+    #   #
+    #   #     lines(times, predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
+    #   #           ylab = "Counts")
+    #   #
+    #   #     lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
+    #   #           ylab = "Counts")
+    #   #
+    #   #     legend(1, legendPosition, legend=c("Vaka", "Ölüm", "Üstel model", "Güven aralığı (%95)"),
+    #   #            col=c("blue", "violet", "red", "black"), lty=1)
+    #   #
+    #   #     legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
+    #   #
+    #   #   }
+    #   #
+    #   # }
+    # 
     # }
-
-    }
-
-    if(expModelPlot){
-
-
-      times <- seq(1,nrow(dataset()), 1)
-      predictions <- exp(predict(exponentialModel(),
-                                 list(x=times),interval = "confidence"))
-
-      xlimit = c(1, max(nrow(dataset()), max(times, na.rm = TRUE), na.rm = TRUE))
-      ylimit = c(1,max(max(predictions[,"fit"], na.rm = TRUE), max(dataset()[,"Toplam Vaka"], na.rm = TRUE), na.rm = TRUE))
-
-      plot.new()
-      plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-           main = "Toplam Resmi COVID-19 Vakaları")
-
-      lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
-            ylab = "Counts")
-
-      lines(type="o",times[8:nrow(dataset())], predictions[,"fit"], lwd=2, col = "red", xlab = "Time (s)",
-            ylab = "Counts")
-
-
-        # lines(times[8:nrow(dataset())], predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
-        #       ylab = "Counts")
-        #
-        # lines(times[8:nrow(dataset())], predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
-        #       ylab = "Counts")
-        #
-
-
-        # legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"fit"]))
-
-        legend("topleft", legend=c("Vaka", "Üstel model"),
-               col=c("blue", "red"), lty=1)
-
-
-
-      # if(input$totalDeaths){
-      #
-      #   lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
-      #         ylab = "Counts")
-      #
-      #
-      #   # legend(1, legendPosition, legend=c("Vaka","Ölüm", "Üstel model"),
-      #   #        col=c("blue", "violet", "red"), lty=1)
-      #
-      #   if(input$addCI){
-      #
-      #     lines(times, predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
-      #           ylab = "Counts")
-      #
-      #     lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
-      #           ylab = "Counts")
-      #
-      #     legend(1, legendPosition, legend=c("Vaka", "Ölüm", "Üstel model", "Güven aralığı (%95)"),
-      #            col=c("blue", "violet", "red", "black"), lty=1)
-      #
-      #     legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
-      #
-      #   }
-      #
-      # }
-
-    }
 
 
   })
 
   ##### Toplam Ölüm ve İyileşme Grafiği ####
 
-  output$plotTotalDeatsRecovered <- renderPlot({
+  output$plotTotalDeatsRecovered <- renderPlotly({
 
+# 
+# 
+#     xlimit = c(1, nrow(dataset()))
+#     ylimit = c(1,max(max(dataset()[,"Toplam Ölüm"]), max(dataset()[,"Toplam İyileşme"])))
+#     legendPosition = max(max(dataset()[nrow(dataset()),"Toplam Ölüm"]), max(dataset()[,"Toplam İyileşme"]))
+# 
+#     plot.new()
+#     plot(1, type="n", xlab="Gün", ylab="Sayı", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+#          main = "Toplam Resmi COVID-19 Ölüm ve İyileşme Vakaları")
+# 
+#     lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "red", xlab = "Time (s)",
+#           ylab = "Counts")
+# 
+# 
+#         lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam İyileşme"], lwd=2, col = "blue", xlab = "Time (s)",
+#               ylab = "Counts")
+# 
+# 
+#         legend("topleft", legend=c("Ölüm","İyileşme"),
+#                col=c("red", "blue"), lty=1)
 
+        
+        fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam İyileşme"], name = 'İyileşme', type = 'scatter', mode = 'lines+markers') 
+        fig <- fig %>% add_trace(y =dataset()[,"Toplam Ölüm"], name = 'Ölüm', mode = 'lines+markers',
+                                 line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
 
-    xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(max(dataset()[,"Toplam Ölüm"]), max(dataset()[,"Toplam İyileşme"])))
-    legendPosition = max(max(dataset()[nrow(dataset()),"Toplam Ölüm"]), max(dataset()[,"Toplam İyileşme"]))
-
-    plot.new()
-    plot(1, type="n", xlab="Gün", ylab="Sayı", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Toplam Resmi COVID-19 Ölüm ve İyileşme Vakaları")
-
-    lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "red", xlab = "Time (s)",
-          ylab = "Counts")
-
-
-        lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam İyileşme"], lwd=2, col = "blue", xlab = "Time (s)",
-              ylab = "Counts")
-
-
-        legend("topleft", legend=c("Ölüm","İyileşme"),
-               col=c("red", "blue"), lty=1)
-
-
-
+        fig%>% layout(title = "<b>Toplam Ölüm ve İyileşme Vakaları</b>", xaxis = list(title = "Gün"), 
+                      yaxis=list(title = "Sayı"), showlegend = TRUE, autosize = TRUE,
+                      margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+          layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+        
   })
 
   ##### log(Toplam Vaka) Grafiği ####
@@ -343,35 +492,34 @@ server <- function(input, output, session) {
 
   ##### Test vs Vaka ####
 
-  output$testVsCasePlot <- renderPlot({
+  output$testVsCasePlot <- renderPlotly({
 
 
     data = dataset()
 
-    time <- data$Time
-    newTest <- data$`Yeni Test`
-    newCaseRatio <- data$`Yeni Vaka Tespit Etme Oranı (%)`
-
-    par(mar=c(5, 4, 4, 6) + 0.1)
-
-    ylimit = max(newTest, na.rm = TRUE)
-    plot(time, newTest, axes=FALSE, ylim=c(0,ylimit), xlab="", ylab="",  panel.first = grid(),
-         type="o",col="blue", main="Günlük Yeni Test Sayısı ve Yeni Vaka Tespit Oranı", lwd = 2)
-    axis(2, ylim=c(0,ylimit),col="blue",col.axis="blue", las=1)  ## las=1 makes horizontal labels
-    mtext("Yeni Test Sayısı",col="blue",side=2,line=3)
-    box()
-
-
-    par(new=TRUE)
-
-    ylimit2 = max(newCaseRatio, na.rm = TRUE)
-    plot(time, newCaseRatio,  xlab="", ylab="", ylim=c(0,ylimit2),
-         axes=FALSE, type="o", col="red", panel.first = grid(), lwd=2)
-    mtext("Yeni Vaka Tespit Etme Oranı (%)",side=4,col="red",line=2.5)
-    axis(4, ylim=c(0,ylimit2), col="red",col.axis="red",las=2)
-
-    axis(1,pretty(range(time),length(time)))
-    mtext("Gün",side=1,col="black",line=2.5)
+    time1 <- data$Time
+    time = time1[8:length(time1)]
+    newTest <- data$`Yeni Test`[8:length(time1)]
+    newCaseRatio <- data$`Yeni Vaka Tespit Etme Oranı (%)`[8:length(time1)]
+   
+    ay <- list(
+      tickfont = list(color = "red"),
+      overlaying = "y",
+      side = "right",
+      title = "Yeni Vaka Tespit Oranı (%)"
+    )
+   
+    
+    fig <- plot_ly(x = time, y = newTest, name = 'Yeni Test', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(x = time, y =newCaseRatio, yaxis = "y2", name = 'Yeni Vaka Oranı', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Yeni Test ve Yeni Vaka Oranı</b>", yaxis2 = ay,
+                  xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Yeni Test Sayısı"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+    
 
 
   })
@@ -402,134 +550,217 @@ server <- function(input, output, session) {
 
   ##### Toplam Test Grafiği ####
 
-  output$plotTotalTests <- renderPlot({
+  output$plotTotalTests <- renderPlotly({
 
 
 
-    xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(dataset()[,"Toplam Test"], na.rm = TRUE))
+    # xlimit = c(1, nrow(dataset()))
+    # ylimit = c(1,max(dataset()[,"Toplam Test"], na.rm = TRUE))
+    # 
+    # plot.new()
+    # plot(1, type="n", xlab="Gün", ylab="Toplam Test", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+    #      main = "")
+    # 
+    # lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Test"], lwd=2, col = "blue", xlab = "Time (s)",
+    #       ylab = "Counts")
+    # 
+    # legend("topleft", legend=c("Test"),
+    #        col=c("blue"), lty=1)
 
-    plot.new()
-    plot(1, type="n", xlab="Gün", ylab="Toplam Test", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Toplam Resmi COVID-19 Test Sayısı")
-
-    lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Test"], lwd=2, col = "blue", xlab = "Time (s)",
-          ylab = "Counts")
-
-    legend("topleft", legend=c("Test"),
-           col=c("blue"), lty=1)
-
-
+    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam Test"], type = 'scatter', name = "Test", mode = 'lines+markers')
+    
+    fig %>% layout(title = "<b>Toplam Resmi COVID-19 Test Sayısı</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Toplam Test"), showlegend = TRUE, autosize = TRUE,
+                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
 
 
   })
 
   ##### Toplam Yoğun Bakım ve Entübe Hasta Sayısı ####
 
-  output$plotTotalICU <- renderPlot({
+  output$plotTotalICU <- renderPlotly({
 
 
 
-    xlimit = c(1, nrow(dataset()))
-    ylimit = c(1,max(max(dataset()[,"Toplam Entübe Hasta Sayısı"]), max(dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"])))
+    # xlimit = c(1, nrow(dataset()))
+    # ylimit = c(1,max(max(dataset()[,"Toplam Entübe Hasta Sayısı"]), max(dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"])))
+    # 
+    # plot.new()
+    # plot(1, type="n", xlab="Gün", ylab="Sayı", xlim=xlimit, ylim=ylimit, panel.first = grid(),
+    #      main = "Toplam Resmi Yoğun Bakım ve Entübe Hasta Sayısı")
+    # 
+    # lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"], lwd=2, col = "red", xlab = "Time (s)",
+    #       ylab = "Counts")
+    # 
+    # 
+    # lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Entübe Hasta Sayısı"], lwd=2, col = "blue", xlab = "Time (s)",
+    #       ylab = "Counts")
+    # 
+    # 
+    # legend("topleft", legend=c("Yoğun Bakım","Entübe"),
+    #        col=c("red", "blue"), lty=1)
 
-    plot.new()
-    plot(1, type="n", xlab="Gün", ylab="Sayı", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-         main = "Toplam Resmi Yoğun Bakım ve Entübe Hasta Sayısı")
-
-    lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"], lwd=2, col = "red", xlab = "Time (s)",
-          ylab = "Counts")
-
-
-    lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Entübe Hasta Sayısı"], lwd=2, col = "blue", xlab = "Time (s)",
-          ylab = "Counts")
-
-
-    legend("topleft", legend=c("Yoğun Bakım","Entübe"),
-           col=c("red", "blue"), lty=1)
-
-
+    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam Yoğun Bakım Hasta Sayısı"], name = 'Yoğun Bakım', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(y =dataset()[,"Toplam Entübe Hasta Sayısı"], name = 'Entübe', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Yoğun Bakım ve Entübe Hasta</b>", xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Sayı"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
 
   })
 
 
 
-  ##### Toplam Test (Milyonda) vs Vaka (Bin Test) ####
+  ##### Toplam Test (Milyonda) ve Vaka (Bin Test) ####
 
-  output$plotTestCaseAdjusted <- renderPlot({
+  output$plotTestCaseAdjusted <- renderPlotly({
 
     data = dataset()
     time <- data$Time
     test <- data$`Test Sayısı (Milyonda)`
     case <- data$`Tespit Edilen Vaka Sayısı (Bin Test)`
-
-    par(mar=c(5, 4, 4, 6) + 0.1)
-
-    ylimit = max(test, na.rm = TRUE)
-    plot(time, test, axes=FALSE, ylim=c(0,ylimit), xlab="", ylab="",  panel.first = grid(),
-         type="o",col="blue", main="Test Sayısı (Milyonda) ve Vaka Sayısı (Bin Test)", lwd = 2)
-    axis(2, ylim=c(0,ylimit),col="blue",col.axis="blue", las=1)  ## las=1 makes horizontal labels
-    mtext("Toplam Test Sayısı (Milyonda)",col="blue",side=2,line=3)
-    box()
-
-
-    par(new=TRUE)
-
-    ylimit2 = max(case, na.rm = TRUE)
-    plot(time, case,  xlab="", ylab="", ylim=c(0,ylimit2),
-         axes=FALSE, type="o", col="red", panel.first = grid(), lwd=2)
-    mtext("Toplam Vaka Sayısı (Bin Test)",side=4,col="red",line=2.5)
-    axis(4, ylim=c(0,ylimit2), col="red",col.axis="red",las=2)
-
-    axis(1,pretty(range(time),length(time)))
-    mtext("Gün",side=1,col="black",line=2.5)
-
-
+    
+    ay <- list(
+      tickfont = list(color = "red"),
+      overlaying = "y",
+      side = "right",
+      title = "Vaka Sayısı (Bin Test)"
+    )
+    
+    
+    fig <- plot_ly(x = time, y = test, name = 'Test (Milyonda)', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(x = time, y =case, yaxis = "y2", name = 'Vaka (Bin Test)', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Test (Milyonda) ve Vaka (Bin Test)</b>", yaxis2 = ay,
+                  xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Toplam Test Sayısı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+    
 
   })
 
-  ##### Günlük Yeni Vakalar ####
+  ##### Toplam Test vs Toplam Vaka Sayısı (Milyonda) #######
+  
+  output$plotTotalTestCaseAdjusted <- renderPlotly({
+    
+    data = dataset()
+    time <- data$Time
+    test <- data$`Test Sayısı (Milyonda)`
+    case <- data$`Toplam Vaka (Milyonda)`
+    
+    ay <- list(
+      tickfont = list(color = "red"),
+      overlaying = "y",
+      side = "right",
+      title = "Toplam Vaka Sayısı (Milyonda)"
+    )
+    
+    
+    fig <- plot_ly(x = time, y = test, name = 'Test (Milyonda)', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(x = time, y =case, yaxis = "y2", name = 'Vaka (Milyonda)', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Test ve Vaka (Milyonda)</b>", yaxis2 = ay,
+                  xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Toplam Test Sayısı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+    
+    
+  })
+  
+   ##### Günlük Yeni Vakalar ####
 
-  output$barPlotNewCases <- renderPlot({
+  output$barPlotNewCases <- renderPlotly({
 
-    barplot(dataset()[,"Yeni Vaka"]~seq(1, nrow(dataset()),1),
-            xlab = "Gün", ylab="Günlük Yeni Vaka Sayısı" ,main = "Günlük Yeni Vakalar", panel.first = grid())
+    # barplot(dataset()[,"Yeni Vaka"]~seq(1, nrow(dataset()),1),
+    #         xlab = "Gün", ylab="Günlük Yeni Vaka Sayısı" ,main = "Günlük Yeni Vakalar", panel.first = grid())
+    # 
 
+   fig <- plot_ly(
+      x = seq(1, nrow(dataset()),1),
+      y = dataset()[,"Yeni Vaka"],
+      type = "bar")
+    
+    fig %>% layout(title = "<b>Günlük Yeni Vakalar</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Günlük Yeni Vaka Sayısı"), showlegend = FALSE,margin = list(l=50, r=50, b=0, t=50, pad=4))%>% config(displayModeBar = F)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE)) 
 
+    
+    
+    
+    
   })
 
 
 
   ##### Günlük Yeni Ölümler ####
 
-  output$barPlotNewDeaths <- renderPlot({
+  output$barPlotNewDeaths <- renderPlotly({
 
-    barplot(dataset()[,"Yeni Ölüm"]~seq(1, nrow(dataset()),1),
-            xlab = "Gün", ylab="Günlük Yeni Ölüm Sayısı" ,main = "Günlük Yeni Ölümler", panel.first = grid())
+    # barplot(dataset()[,"Yeni Ölüm"]~seq(1, nrow(dataset()),1),
+    #         xlab = "Gün", ylab="Günlük Yeni Ölüm Sayısı" ,main = "Günlük Yeni Ölümler", panel.first = grid())
 
-
+    fig <- plot_ly(
+      x = seq(1, nrow(dataset()),1),
+      y = dataset()[,"Yeni Ölüm"],
+      type = "bar")
+    
+    fig %>% layout(title = "<b>Günlük Yeni Ölüm Sayısı</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Günlük Yeni Ölümler"), showlegend = FALSE,margin = list(l=50, r=50, b=0, t=50, pad=4))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
   })
 
 
   ##### Günlük Yeni İyileşmeler ####
 
-  output$barPlotNewRecovered <- renderPlot({
+  output$barPlotNewRecovered <- renderPlotly({
 
-    barplot(dataset()[,"Yeni İyileşme"]~seq(1, nrow(dataset()),1),
-            xlab = "Gün", ylab="Günlük Yeni İyileşme Sayısı" ,main = "Günlük Yeni İyileşmeler", panel.first = grid())
+    # barplot(dataset()[,"Yeni İyileşme"]~seq(1, nrow(dataset()),1),
+    #         xlab = "Gün", ylab="Günlük Yeni İyileşme Sayısı" ,main = "Günlük Yeni İyileşmeler", panel.first = grid())
 
-
+    
+    fig <- plot_ly(
+      x = seq(1, nrow(dataset()),1),
+      y = dataset()[,"Yeni İyileşme"],
+      type = "bar")
+    
+    fig %>% layout(title = "<b>Günlük Yeni İyileşme Sayısı</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Günlük Yeni İyileşmeler"), showlegend = FALSE,margin = list(l=50, r=50, b=0, t=50, pad=4))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    
+    
   })
 
 
   ##### Günlük Yeni Test ####
 
-  output$barPlotNewTest <- renderPlot({
+  output$barPlotNewTest <- renderPlotly({
 
-    barplot(dataset()[,"Yeni Test"]~seq(1, nrow(dataset()),1),
-            xlab = "Gün", ylab="Günlük Yeni Test Sayısı" ,main = "Günlük Yeni Test Sayısı", panel.first = grid())
+    # barplot(dataset()[,"Yeni Test"]~seq(1, nrow(dataset()),1),
+    #         xlab = "Gün", ylab="Günlük Yeni Test Sayısı" ,main = "Günlük Yeni Test Sayısı", panel.first = grid())
+    # 
 
-
+    
+    fig <- plot_ly(
+      x = seq(1, nrow(dataset()),1),
+      y = dataset()[,"Yeni Test"],
+      type = "bar")
+    
+    fig %>% layout(title = "<b>Günlük Yeni Test Sayısı</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Günlük Yeni Test Sayısı"), showlegend = FALSE,margin = list(l=50, r=50, b=0, t=50, pad=4))%>% config(displayModeBar = F)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE)) 
+    
+    
+    
+    
   })
 
 
@@ -559,7 +790,7 @@ server <- function(input, output, session) {
 
     allConfirmed = sum(dataWorld()[[3]]$MaxConfirmed, na.rm=TRUE)
     allDeaths = sum(dataWorld()[[3]]$MaxDeaths, na.rm=TRUE)
-    allRecovered = sum(dataWorld()[[3]]$MaxRecovered, na.rm=TRUE)
+    allRecovered = sum(dataWorld()[[3]]$MaxRecovered[!is.infinite(dataWorld()[[3]]$MaxRecovered)], na.rm=TRUE)
 
     world = cbind.data.frame("Global", allConfirmed, allDeaths, allRecovered)
     colnames(world) = c("Ülke", "Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen")
@@ -570,7 +801,7 @@ server <- function(input, output, session) {
 
     datatable(dataComparedCountries,
               extensions = c('Buttons','KeyTable', 'Responsive'),
-              rownames= FALSE,options = list(pageLength = 100, info = FALSE,bFilter = FALSE, paging = FALSE, dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),
+              rownames= FALSE,options = list(columnDefs = list(list(className = 'dt-center',targets='_all')),pageLength = 100, info = FALSE,bFilter = FALSE, paging = FALSE, dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),
                                                                                                                                                                                             text = 'İndir')), keys = TRUE
     ))
 
@@ -736,7 +967,7 @@ server <- function(input, output, session) {
 
         for(coord in 1:length(splitCoordinates)){
 
-          df = splitCoordinates[[coord]][-9]
+          df = splitCoordinates[[coord]][-c(9,10)]
           df2 = df[complete.cases(df),]
 
           coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
@@ -952,7 +1183,7 @@ server <- function(input, output, session) {
 
       for(coord in 1:length(splitCoordinates)){
 
-        df = splitCoordinates[[coord]][-9]
+        df = splitCoordinates[[coord]][-c(9,10)]
         df2 = df[complete.cases(df),]
 
         coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
@@ -1166,7 +1397,7 @@ server <- function(input, output, session) {
 
        for(coord in 1:length(splitCoordinates)){
 
-         df = splitCoordinates[[coord]][-9]
+         df = splitCoordinates[[coord]][-c(9,10)]
          df2 = df[complete.cases(df),]
 
          coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
@@ -1254,7 +1485,64 @@ if(input$highlightCountry){
 
 
   })
-
+  
+  #### Ülkelerin normalize edilmiş test/vaka karşılaştırması (grafik) #####
+  output$testComparisonPopTestAdjustedPlot2 <- renderPlotly({
+    
+    plotData = dataTest()
+    
+    
+    fig1 <- plot_ly(x = plotData$Positive_Thousand_Test, y = ~reorder(plotData$Country, plotData$Positive_Thousand_Test), name = 'Vaka Sayısı (Bin Test)',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = 'rgba(50, 171, 96, 0.6)',
+                                  line = list(color = 'rgba(50, 171, 96, 1.0)', width = 1))) 
+    
+    fig1 <- fig1 %>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = TRUE, domain= c(0, 0.85)),
+                            xaxis = list(zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE)) 
+    fig1 <- fig1 %>% add_annotations(xref = 'x1', yref = 'y',
+                                     x = plotData$Positive_Thousand_Test * 1.05 + 10,  y = plotData$Country,
+                                     text = paste(round(plotData$Positive_Thousand_Test, 2)),
+                                     font = list(family = 'Arial', size = 12, color = 'rgb(50, 171, 96)'),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    
+    fig2 <- plot_ly(x = plotData$Test_million_population, y = ~reorder(plotData$Country, plotData$Positive_Thousand_Test), name = 'Test Sayısı (Milyonda)',
+                    type = 'bar', orientation = 'h') 
+    
+    fig2 <- fig2%>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = FALSE, domain= c(0, 0.85)),
+                           xaxis = list(zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE)) 
+    
+    
+    fig2 <- fig2 %>% add_annotations(xref = 'x', yref = 'y',
+                                     x = plotData$Test_million_population * 1.3 + 1150,  y = plotData$Country,
+                                     text = paste(round(plotData$Test_million_population, 2)),
+                                     font = list(family = 'Arial', size = 12),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    fig2
+    
+    fig <- subplot(fig1, fig2) 
+    
+    fig <- fig %>% layout(title = 'Vaka Sayısı (Bin Test) ve Test Sayısı (Milyonda)', font = list(size=11),
+                          legend = list(x = 0.029, y = 1.038,
+                                        font = list(size = 12)),
+                          margin = list(l = 100, r = 20, t = 70, b = 70),
+                          paper_bgcolor = 'rgb(248, 248, 255)',
+                          plot_bgcolor = 'rgb(248, 248, 255)')
+    
+    fig <- fig %>% add_annotations(xref = 'paper', yref = 'paper',
+                                   x = 0, y = -0.15,
+                                   text = paste('Ülkelerin 6-7 Nisan 2020 tarihleri arasındaki verileri kullanılarak oluşturulmuştur.'),
+                                   font = list(family = 'Arial', size = 10, color = 'rgb(150,150,150)'),
+                                   showarrow = FALSE)
+    
+    fig%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+  })
+  
   #### Ülkelerin vaka artış hızları #####
   output$growtRate <- renderPlot({
     
@@ -1649,6 +1937,66 @@ if(input$highlightCountry){
   })
   
   
+  #### Ülkelerin raporlanan vakalarının yüzde kestirimi #####
+  
+  #### Tablo #####
+  output$underReportingTable <- DT::renderDataTable({
+    
+    
+    data = underReporting()
+    
+    data[data$country == "United States of America", ]$country = "US"
+    data[data$country == "South Korea", ]$country = "Korea, South"
+    
+    
+    
+    data =data[data$country %in% input$countries,c(1,7)]
+ 
+    colnames(data) = c("Ülke", "Tahmini Raporlanan Vaka (%95 Güven Aralığı) " )
+      datatable(data, extensions = c('Buttons','KeyTable', 'Responsive'), rownames= FALSE,
+                options = list(columnDefs = list(list(className = 'dt-center',targets='_all')), pageLength = 100, info = FALSE,bFilter = FALSE, paging = FALSE, 
+                               dom = 'Bfrtip',buttons = list(list(extend = 'collection',
+                                                                  buttons = c('csv', 'excel', 'pdf'),
+                                               
+                                                                                                                                               text = 'İndir')), keys = TRUE
+      ))
+      
+    
+  })
+  
+  
+  #### Grafik ####
+  output$underReportingPlot <- renderPlot({
+    
+    
+    data = underReporting()
+    
+    data[data$country == "United States of America", ]$country = "US"
+    data[data$country == "South Korea", ]$country = "Korea, South"
+    
+    
+    data =data[data$country %in% input$countries,]
+    
+    data$country <- factor(data$country, levels = data$country[order(data$underreporting_estimate,decreasing = T)])
+    data$underreporting_estimate = 100*data$underreporting_estimate
+    data$lower = 100*data$lower
+    data$upper = 100*data$upper
+    
+    ggplot(data, aes(x=country, y=underreporting_estimate)) + 
+      geom_errorbar(aes(ymin=lower, ymax=upper),
+                    width=0.1, size=1.1, col = "blue") +
+      geom_point(col = "red") + coord_flip() +scale_y_continuous(limits = c(0,100))+
+      ylab("Tahmini Vaka Raporlama Yüzdesi") + xlab("")+
+      theme(text = element_text(size=14),legend.title=element_blank())+
+      geom_hline(yintercept=0, linetype="dashed", size = 2)+
+      geom_hline(yintercept=100, linetype="dashed", size = 2)
+    
+    
+  })
+  
+  
+  ######## Başlıklar ####################
+  
   output$table1 <- renderText({
 
     "Bölüm 1. Türkiye'deki COVID-19 Vaka İstatistikleri"
@@ -1659,11 +2007,18 @@ if(input$highlightCountry){
     "Bölüm 2. Dünyadaki COVID-19 Vaka İstatistikleri"
   })
 
-  output$table2 <- renderText({
 
-    "Bölüm 2. Dünyadaki COVID-19 Vaka İstatistikleri"
+  
+  output$table3 <- renderText({
+    
+    "Ülkelerin Tahmini Semptomatik Vaka Raporlama Yüzdeleri"
   })
-
+  
+  output$worldMapText <- renderText({
+    
+    "Dünya Haritası"
+  })
+  
 
 
 }
