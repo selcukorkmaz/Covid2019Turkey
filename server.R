@@ -7,8 +7,15 @@ library(tidyr)
 library(gghighlight)
 library(plotly)
 library(shinyjs)
+library(pracma)
+library(Metrics)
+library(readr)
 source("worldData2.R")
+source("worldData3.R")
 source("underReporting.R")
+# source("scale_CFR.R")
+# source("delay_distributions.R")
+# source("table_of_estimates.R")
 
 server <- function(input, output, session) {
 
@@ -44,7 +51,8 @@ server <- function(input, output, session) {
 
   updateSelectizeInput(session, "countries", choices =  as.character(countries()), selected = c("Turkey",
     "Germany", "Italy", "Spain","France","Iran", "US", "China", "United Kingdom", "Korea, South", 
-    "Switzerland", "Austira", "Belgium", "Canada", "Netherlands"))
+    "Switzerland", "Austria", "Belgium", "Canada", "Netherlands", "Portugal", "Brazil", "Sweden", "Israel", "Japan",
+      "Peru", "India"))
 
 
   })
@@ -64,10 +72,11 @@ server <- function(input, output, session) {
 
     data <- read.table("www/data/covid_cases.txt", header = TRUE, sep = "\t")
     colnames(data) = c("Tarih", "Toplam Vaka", "Yeni Vaka", "Toplam Ölüm", "Yeni Ölüm",
-                       "Toplam İyileşme", "Yeni İyileşme",  "Toplam Yoğun Bakım Hasta Sayısı",
+                       "Toplam İyileşme", "Yeni İyileşme", "Aktif Vaka",  "Toplam Yoğun Bakım Hasta Sayısı",
                        "Toplam Entübe Hasta Sayısı", "Toplam Test", "Yeni Test", "Test Sayısı (Milyonda)",
-                       "Tespit Edilen Vaka Sayısı (Bin Test)", "Toplam Vaka (Milyonda)", "Vaka Değişim Oranı (%)", 
-                       "Yeni Vaka Tespit Etme Oranı (%)", "Time")
+                       "Test Başına Vaka (%)", "Toplam Vaka (Milyonda)", "Vaka Değişim Oranı (%)", 
+                       "Yeni Vaka Tespit Etme Oranı (%)", "Ölüm Oranı (%)", "Kapanan Vakada Ölüm (%)", "Büyüme Faktörü", "Test Değişim Oranı (%)",
+                       "Time")
     return(data)
 
   })
@@ -78,62 +87,35 @@ server <- function(input, output, session) {
     data <- read.table("www/data/summary.txt", header = TRUE, sep = "\t")
     colnames(data) = c("Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen Vaka", "Toplam Aktif Vaka",
                        "Ölüm Oranı (%)","Toplam Test", "Toplam Vaka (Milyonda)",
-                       "Test Sayısı (Milyonda)", "Tespit Edilen Vaka Sayısı (Bin Test)")
+                       "Test Sayısı (Milyonda)", "Tespit Edilen Test Başına Vaka (%)")
     return(data)
 
   })
 
 
   #### Dünya Test verileri ####
-  dataTest <- reactive({
-    
-    test = read.table("www/data/tests.txt", header=FALSE, comment.char="#",
-                      na.strings=".", stringsAsFactors=FALSE,
-                      quote="", fill=TRUE, sep = "\t")
-    
-    colnames(test) = c("Country", "Tests", "Positive", "Date", "Test_million_population", "Positive_Thousand_Test", "Ref")
-    
-    head(test)
-    test$Country
-    
-    splitTest = split(test, test$Country)
-    testCountries = list()
-    
-    for(i in 1:length(splitTest)){
-      
-      df = splitTest[i]
-      
-      if(grepl(":", names(df))){
-        
-        df = NULL
-        
-        
-      }
-      
-      else if(grepl("\\(", names(df))){
-        
-        df[[1]]$Country =  gsub("\\(.*","",names(df))
-      }
-      
-      testCountries[i] = df
-    }
-    
-    
-    combinedTestCountries = data.table::rbindlist(testCountries)
-    
-    combinedTestCountries = combinedTestCountries[complete.cases(combinedTestCountries),]
-    
-    plotData = dplyr::filter(combinedTestCountries, combinedTestCountries$Positive >=10000)
-    
-    plotData= plotData[plotData$Date %in% c("4 Apr", "5 Apr", "6 Apr", "7 Apr"), ]
-    plotData= plotData[!(plotData$Country %in% c("  California", "  Emilia-Romagna", "  Florida", "  Illinois",
-                                                 "  Lombardy" , "  Louisiana", "  Michigan",
-                                                 "  New Jersey", "  New York","  Piedmont" ,
-                                                 "  Veneto")), ]
-    
-    return(plotData)
-    
-    
+  dataTest <- reactive({test = read.table("www/data/testsNew.txt", header=FALSE, sep = "\t")
+  
+  head(test)
+  
+  colnames(test) = c("Country", "Date", "Test", "Positive", "Positive_Rate", "Test_million_population", "Positive_million_population", "Ref")
+  head(test)
+  
+  combinedTestCountries = test#data.table::rbindlist(testCountries)
+  
+  combinedTestCountries = combinedTestCountries[complete.cases(combinedTestCountries),]
+  
+  plotData = dplyr::filter(combinedTestCountries, combinedTestCountries$Positive >=10000)
+  
+  plotData= plotData[plotData$Date %in% c("27 April", "28 April", "29 April", "30 April", "1 May"), ]
+  plotData$Country=as.character(plotData$Country)
+  
+  plotData$Country[plotData$Country %in% "UnitedStates"] = "US" 
+  plotData$Country[plotData$Country %in% "SouthKorea"] = "South Korea" 
+  plotData$Country[plotData$Country %in% "UnitedKingdom[b]"] = "United Kingdom" 
+  plotData = plotData[!(plotData$Country %in% c("UnitedArabEmirates")),]
+  
+  return(plotData)
   })
 
 ####### DASHBOARDS ###########
@@ -195,16 +177,16 @@ server <- function(input, output, session) {
   output$totalCaseMillion <- renderUI({
     
     infoBox(
-      "TOPLAM VAKA (MİLYONDA)", summaryData()[1,7], icon = icon("sort-numeric-up"), color = "yellow",
+      "VAKA SIKLIĞI (MİLYONDA)", summaryData()[1,7], icon = icon("sort-numeric-up"), color = "yellow",
       fill = TRUE
     )
     
   })
   
-  output$totalCaseThousandTest <- renderUI({
+  output$deathRateClosedCases <- renderUI({
     
     infoBox(
-      "VAKA SAYISI (BİN TEST)", summaryData()[1,9], icon = icon("sort-numeric-up"), color = "red",
+      "KAPANAN VAKADA ÖLÜM ORANI (%)", summaryData()[1,10], icon = icon("percentage"), color = "red",
       fill = TRUE
     )
     
@@ -213,11 +195,41 @@ server <- function(input, output, session) {
   output$totalTesMillion <- renderUI({
 
     infoBox(
-      "TEST SAYISI (MİLYONDA)", summaryData()[1,8], icon = icon("sort-numeric-up"), color = "green",
+      "TEST SIKLIĞI (MİLYONDA)", summaryData()[1,8], icon = icon("sort-numeric-up"), color = "green",
       fill = TRUE
     )
     
   })
+  
+  output$icuCases <- renderUI({
+    
+    infoBox(
+      "YOĞUN BAKIM HASTA SAYISI", summaryData()[1,11], icon = icon("stethoscope"), color = "yellow",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$totalCaseThousandTest <- renderUI({
+    
+    infoBox(
+      "TEST BAŞINA VAKA (%)", summaryData()[1,9], icon = icon("percentage"), color = "red",
+      fill = TRUE
+    )
+    
+  })
+  
+  output$entCases <- renderUI({
+    
+    infoBox(
+      "ENTÜBE HASTA SAYISI", summaryData()[1,12], icon = icon("stethoscope"), color = "yellow",
+      fill = TRUE
+    )
+    
+  })
+  
+
+  
   
   
   #### Tablo ####
@@ -225,7 +237,7 @@ server <- function(input, output, session) {
 
     if(input$dataset == 'Tüm'){
 
-      dataset()[-ncol(dataset())]
+      dataset()[1:21]
       
     }
 
@@ -333,99 +345,128 @@ server <- function(input, output, session) {
   ##### Toplam Vaka Grafiği ####
 
   output$plotTotalCases <- renderPlotly({
-    # expModelPlot=FALSE
+   
+    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam Vaka"], type = 'scatter', name = "Vaka", mode = 'lines+markers'
+                   , line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red')))
     
     
+    if(input$kalmanFilter){
+      
+      
+      all<- dataset()[1:2]
+      
+      colnames(all) = c("date", "Turkey")
+      print(all)
+      d = unlist(strsplit(as.character(all[nrow(all),1]), "\\."))
+      print(d)
+      d2 = paste0(d[3],"/",d[2],"/",d[1])
+      print(d2)
+      d2 = as.Date(paste0(d[3],"/",d[2],"/",d[1]))
+      all$date =seq(as.Date("2020/3/11"), d2, by=1)
+      
+      original = all
+      # all$X1<-NULL
+      date<-all[1]
+      future = 1
+      z=1
+      
+      
+      while(future >= z ){
+        print(z)
+        z= z+1  
+        date<-all[1]
+        
+        date[nrow(date) + 1,1] <-all[nrow(all),1]+1
+        pred_all<-NULL
+        date$date = as.character(date$date)
+        for (n in 2:ncol(all)-1) {
+          Y<-ts(data = all[n+1], start = 1, end =nrow(all)+1)  
+          sig_w<-0.1
+          w<-sig_w*randn(1,10000) # acceleration which denotes the fluctuation (Q/R) rnorm(100, mean = 0, sd = 1)
+          sig_v<-0.1
+          v<-sig_v*randn(1,10000)   
+          t<-0.45
+          # t=t1+0.5*(z-1)
+          phi<-matrix(c(1,0,t,1),2,2)
+          gama<-matrix(c(0.5*(t)^2,t),2,1)
+          H<-matrix(c(1,0),1,2)
+          #Kalman
+          x0_0<-p0_0<-matrix(c(0,0),2,1)
+          p0_0<-matrix(c(1,0,0,1),2,2)
+          Q<-0.1
+          R<-0.1
+          X<-NULL
+          X2<-NULL
+          pred<-NULL
+          for (i in 0:nrow(all)) {
+            namp <-paste("p", i+1,"_",i, sep = "")
+            assign(namp, phi%*%(get(paste("p", i,"_",i, sep = "")))%*%t(phi)+gama%*%Q%*%t(gama))
+            namk <- paste("k", i+1, sep = "")
+            assign(namk,get(paste("p", i+1,"_",i, sep = ""))%*%t(H)%*%(1/(H%*%get(paste("p", i+1,"_",i, sep = ""))%*%t(H)+R)))
+            namx <- paste("x", i+1,"_",i, sep = "")
+            assign(namx,phi%*%get(paste("x", i,"_",i, sep = "")))
+            namE <- paste("E", i+1, sep = "")
+            assign(namE,Y[i+1]-H%*%get(paste("x", i+1,"_",i, sep = "")))
+            namx2 <- paste("x", i+1,"_",i+1, sep = "")
+            assign(namx2,get(paste("x", i+1,"_",i, sep = ""))+get(paste("k", i+1, sep = ""))%*%get(paste("E", i+1, sep = "")))
+            namp2 <- paste("p", i+1,"_",i+1, sep = "")
+            assign(namp2,(p0_0-get(paste("k", i+1, sep = ""))%*%H)%*%get(paste("p", i+1,"_",i, sep = "")))
+            X<-rbind(X,get(paste("x", i+1,"_",i,sep = ""))[1])
+            X2<-rbind(X2,get(paste("x", i+1,"_",i,sep = ""))[2])
+            if(i>2){
+              remove(list=(paste("p", i-1,"_",i-2, sep = "")))
+              remove(list=(paste("k", i-1, sep = "")))
+              remove(list=(paste("E", i-1, sep = "")))
+              remove(list=(paste("p", i-2,"_",i-2, sep = "")))
+              remove(list=(paste("x", i-1,"_",i-2, sep = "")))
+              remove(list=(paste("x", i-2,"_",i-2, sep = "")))}
+          }
+          pred<-NULL
+          pred<-cbind(Y,X,round(X2,4))
+          pred<-as.data.frame(pred)
+          pred$region<-colnames(all[,n+1])
+          pred$date<-date$date
+          pred$actual<-rbind(0,(cbind(pred[2:nrow(pred),1])/pred[1:nrow(pred)-1,1]-1)*100)
+          pred$predict<-rbind(0,(cbind(pred[2:nrow(pred),2])/pred[1:nrow(pred)-1,2]-1)*100)
+          pred$pred_rate<-(pred$X/pred$Y-1)*100
+          pred$X2_change<-rbind(0,(cbind(pred[2:nrow(pred),3]-pred[1:nrow(pred)-1,3])))
+          pred_all<-rbind(pred_all,pred)
+        }
+        pred_all<-cbind(pred_all[,4:5],pred_all[,1:3])
+        names(pred_all)[5]<-"X2"
+        pred_all<-pred_all[,c(1,3:5)]
+        pred_all$days = 1:nrow(pred_all)
+        sd(pred_all$Y[(nrow(pred_all)-7):nrow(pred_all)])
+        pred_all$Y[nrow(pred_all)] = pred_all$X[nrow(pred_all)]
+        
+        all = pred_all[c(1,2)]
+        all$date = as.Date(all$date)
+        
+        
+      }
+      
+      all$days = seq(1,nrow(all))
+      all$Y = as.numeric(formatC(all$Y, digits = 0, format = "f"))
+      
+      # fig <- plot_ly(x = seq(1:nrow(original)), y = original$Turkey, name = 'Vaka', type = 'scatter', 
+      #                mode = 'lines+markers', line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+      # 
+      fig <- fig %>% add_trace(x = all$days[(nrow(original)):(nrow(original)+future)], 
+                               y =all$Y[(nrow(original)):(nrow(original)+future)], name = 'Sonraki Gün Tahmin', 
+                               mode = 'lines+markers',
+                               line = list(color = "blue"), marker = list(color = 'blue',line = list(color = 'blue'))) 
+      
 
-    # xlimit = c(1, nrow(dataset()))
-    # ylimit = c(1,max(dataset()[,"Toplam Vaka"], na.rm = TRUE))
-    # legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], na.rm = TRUE)
-    # 
-    # plot.new()
-    # plot(1, xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-    #      main = "Toplam Resmi COVID-19 Vakaları")
-    # 
-    # lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
-    #       ylab = "Counts")
-    # 
-    # legend("topleft", legend=c("Vaka"),
-    #        col=c("blue"), lty=1)
-
- 
-    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Toplam Vaka"], type = 'scatter', name = "Vaka", mode = 'lines+markers')
+      
+      
+      
+    }
     
     fig %>% layout(title = "<b>Toplam Resmi COVID-19 Vakaları</b>", xaxis = list(title = "Gün"), 
                    yaxis=list(title = "Toplam Vaka"), showlegend = TRUE, autosize = TRUE,
                    margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
     
-    
-
-    # if(expModelPlot){
-    # 
-    # 
-    #   times <- seq(1,nrow(dataset()), 1)
-    #   predictions <- exp(predict(exponentialModel(),
-    #                              list(x=times),interval = "confidence"))
-    # 
-    #   xlimit = c(1, max(nrow(dataset()), max(times, na.rm = TRUE), na.rm = TRUE))
-    #   ylimit = c(1,max(max(predictions[,"fit"], na.rm = TRUE), max(dataset()[,"Toplam Vaka"], na.rm = TRUE), na.rm = TRUE))
-    # 
-    #   plot.new()
-    #   plot(1, type="n", xlab="Gün", ylab="Toplam Vaka", xlim=xlimit, ylim=ylimit, panel.first = grid(),
-    #        main = "Toplam Resmi COVID-19 Vakaları")
-    # 
-    #   lines(type="o",seq(1:nrow(dataset())), dataset()[,"Toplam Vaka"], lwd=2, col = "blue", xlab = "Time (s)",
-    #         ylab = "Counts")
-    # 
-    #   lines(type="o",times[8:nrow(dataset())], predictions[,"fit"], lwd=2, col = "red", xlab = "Time (s)",
-    #         ylab = "Counts")
-    # 
-    # 
-    #     # lines(times[8:nrow(dataset())], predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
-    #     #       ylab = "Counts")
-    #     #
-    #     # lines(times[8:nrow(dataset())], predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
-    #     #       ylab = "Counts")
-    #     #
-    # 
-    # 
-    #     # legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"fit"]))
-    # 
-    #     legend("topleft", legend=c("Vaka", "Üstel model"),
-    #            col=c("blue", "red"), lty=1)
-    # 
-    # 
-    # 
-    #   # if(input$totalDeaths){
-    #   #
-    #   #   lines(seq(1:nrow(dataset())), dataset()[,"Toplam Ölüm"], lwd=2, col = "violet", xlab = "Time (s)",
-    #   #         ylab = "Counts")
-    #   #
-    #   #
-    #   #   # legend(1, legendPosition, legend=c("Vaka","Ölüm", "Üstel model"),
-    #   #   #        col=c("blue", "violet", "red"), lty=1)
-    #   #
-    #   #   if(input$addCI){
-    #   #
-    #   #     lines(times, predictions[,"lwr"], lwd=2, col = "black", xlab = "Time (s)",
-    #   #           ylab = "Counts")
-    #   #
-    #   #     lines(times, predictions[,"upr"], lwd=2, col = "black", xlab = "Time (s)",
-    #   #           ylab = "Counts")
-    #   #
-    #   #     legend(1, legendPosition, legend=c("Vaka", "Ölüm", "Üstel model", "Güven aralığı (%95)"),
-    #   #            col=c("blue", "violet", "red", "black"), lty=1)
-    #   #
-    #   #     legendPosition = max(dataset()[nrow(dataset()),"Toplam Vaka"], max(predictions[,"upr"]))
-    #   #
-    #   #   }
-    #   #
-    #   # }
-    # 
-    # }
-
-
   })
 
   ##### Toplam Ölüm ve İyileşme Grafiği ####
@@ -461,7 +502,7 @@ server <- function(input, output, session) {
         fig%>% layout(title = "<b>Toplam Ölüm ve İyileşme Vakaları</b>", xaxis = list(title = "Gün"), 
                       yaxis=list(title = "Sayı"), showlegend = TRUE, autosize = TRUE,
                       margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-          layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+          layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
         
   })
 
@@ -490,37 +531,99 @@ server <- function(input, output, session) {
 
   })
 
+  ##### Toplam vs Kapanan Ölüm ####
+  output$totalClosedDeathRate <- renderPlotly({
+    
+    
+    data = dataset()
+    
+    time <- data$Time
+    time2 = time[5:length(time)]
+    deathRate <- data$`Ölüm Oranı (%)`[time2]
+    deathRateClosedCases <- data$`Kapanan Vakada Ölüm (%)`[time2]
+    
+    ay <- list(
+      tickfont = list(color = "red"),
+      overlaying = "y",
+      side = "right",
+      title = "Kapanan Vakada Ölüm Oranı (%)"
+    )
+    
+    
+    fig <- plot_ly(x = time2, y = deathRate, name = 'Toplam', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(x = time2, y =deathRateClosedCases, yaxis = "y2", name = 'Kapanan', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Toplam ve Kapanan Vakada Ölüm (%)</b>", yaxis2 = ay,
+                  xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Ölüm Oranı (%)"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+    
+    
+    
+    
+  })
+  
+  
   ##### Test vs Vaka ####
-
   output$testVsCasePlot <- renderPlotly({
 
 
     data = dataset()
-
+    
     time1 <- data$Time
     time = time1[8:length(time1)]
-    newTest <- data$`Yeni Test`[8:length(time1)]
-    newCaseRatio <- data$`Yeni Vaka Tespit Etme Oranı (%)`[8:length(time1)]
-   
+    newTest <- data$`Yeni Test`[time]
+    newCaseRatio <- data$`Yeni Vaka Tespit Etme Oranı (%)`[time]
+    
+    meanDailyTest = list()
+    
+    meanDailyCaseRatio = list()
+    
+    for(i in 1:(length(time)-6)){
+      
+      j=i+6
+      
+      meanDailyTest[[i]] = mean(newTest[i:j], na.rm = TRUE)
+      
+      meanDailyCaseRatio[[i]] = mean(newCaseRatio[i:j], na.rm = TRUE)
+      
+    }
+    
+    
+    meanDailyTests =  do.call(rbind.data.frame, meanDailyTest)
+    colnames(meanDailyTests) = "Mean_Daily_New_Tests"
+    
+    meanDailyCaseRatio =  do.call(rbind.data.frame, meanDailyCaseRatio)
+    colnames(meanDailyCaseRatio) = "Mean_Daily_Case_Ratio"
+    
+    
+    dailyTestsCaseRatioMean = cbind.data.frame(Days =0:(nrow(meanDailyTests)-1), meanDailyTests, meanDailyCaseRatio)
+    
+    
+    
     ay <- list(
       tickfont = list(color = "red"),
       overlaying = "y",
       side = "right",
       title = "Yeni Vaka Tespit Oranı (%)"
     )
-   
+    
+    time = dailyTestsCaseRatioMean$Days
+    newTest = dailyTestsCaseRatioMean$Mean_Daily_New_Tests
+    newCaseRatio = dailyTestsCaseRatioMean$Mean_Daily_Case_Ratio
     
     fig <- plot_ly(x = time, y = newTest, name = 'Yeni Test', type = 'scatter', mode = 'lines+markers') 
     fig <- fig %>% add_trace(x = time, y =newCaseRatio, yaxis = "y2", name = 'Yeni Vaka Oranı', mode = 'lines+markers',
                              line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
     
-    fig%>% layout(title = "<b>Yeni Test ve Yeni Vaka Oranı</b>", yaxis2 = ay,
+    fig%>% layout(title = "<b>Yeni Test-Vaka Oranı (7 Gün Ort.)</b>", yaxis2 = ay,
                   xaxis = list(title = "Gün"), 
                   yaxis=list(title = "Yeni Test Sayısı"), showlegend = TRUE, autosize = TRUE,
                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.0750, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
     
-
 
   })
 
@@ -548,6 +651,26 @@ server <- function(input, output, session) {
 
   })
 
+  ##### Toplam Aktif Vaka ####
+  
+  output$plotTotalActiveCases <- renderPlotly({
+    
+  
+    
+    fig <- plot_ly(x = seq(1:nrow(dataset())), y = dataset()[,"Aktif Vaka"], type = 'scatter', name = "Aktif Vaka", mode = 'lines+markers'
+                   , line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red')))
+    
+    fig %>% layout(title = "<b>Toplam Resmi Aktif Vaka Sayısı</b>", xaxis = list(title = "Gün"), 
+                   yaxis=list(title = "Aktif Vaka"), showlegend = TRUE, autosize = TRUE,
+                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    
+    
+  })
+  
+  
   ##### Toplam Test Grafiği ####
 
   output$plotTotalTests <- renderPlotly({
@@ -572,7 +695,7 @@ server <- function(input, output, session) {
     fig %>% layout(title = "<b>Toplam Resmi COVID-19 Test Sayısı</b>", xaxis = list(title = "Gün"), 
                    yaxis=list(title = "Toplam Test"), showlegend = TRUE, autosize = TRUE,
                    margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
     
     
 
@@ -610,7 +733,7 @@ server <- function(input, output, session) {
     fig%>% layout(title = "<b>Yoğun Bakım ve Entübe Hasta</b>", xaxis = list(title = "Gün"), 
                   yaxis=list(title = "Sayı"), showlegend = TRUE, autosize = TRUE,
                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
 
   })
 
@@ -623,25 +746,25 @@ server <- function(input, output, session) {
     data = dataset()
     time <- data$Time
     test <- data$`Test Sayısı (Milyonda)`
-    case <- data$`Tespit Edilen Vaka Sayısı (Bin Test)`
+    case <- data$`Test Başına Vaka (%)`
     
     ay <- list(
       tickfont = list(color = "red"),
       overlaying = "y",
       side = "right",
-      title = "Vaka Sayısı (Bin Test)"
+      title = "Test Başına Vaka (%)"
     )
     
     
     fig <- plot_ly(x = time, y = test, name = 'Test (Milyonda)', type = 'scatter', mode = 'lines+markers') 
-    fig <- fig %>% add_trace(x = time, y =case, yaxis = "y2", name = 'Vaka (Bin Test)', mode = 'lines+markers',
+    fig <- fig %>% add_trace(x = time, y =case, yaxis = "y2", name = 'Vaka (%)', mode = 'lines+markers',
                              line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
     
-    fig%>% layout(title = "<b>Test (Milyonda) ve Vaka (Bin Test)</b>", yaxis2 = ay,
+    fig%>% layout(title = "<b>Test (Milyonda) ve Vaka (%)</b>", yaxis2 = ay,
                   xaxis = list(title = "Gün"), 
-                  yaxis=list(title = "Toplam Test Sayısı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
+                  yaxis=list(title = "Test Sıklığı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
     
 
   })
@@ -659,7 +782,7 @@ server <- function(input, output, session) {
       tickfont = list(color = "red"),
       overlaying = "y",
       side = "right",
-      title = "Toplam Vaka Sayısı (Milyonda)"
+      title = "Vaka Sıklığı (Milyonda)"
     )
     
     
@@ -667,14 +790,37 @@ server <- function(input, output, session) {
     fig <- fig %>% add_trace(x = time, y =case, yaxis = "y2", name = 'Vaka (Milyonda)', mode = 'lines+markers',
                              line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
     
-    fig%>% layout(title = "<b>Test ve Vaka (Milyonda)</b>", yaxis2 = ay,
+    fig%>% layout(title = "<b>Test ve Vaka Sıklığı (Milyonda)</b>", yaxis2 = ay,
                   xaxis = list(title = "Gün"), 
-                  yaxis=list(title = "Toplam Test Sayısı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
+                  yaxis=list(title = "Test Sıklığı (Milyonda)"), showlegend = TRUE, autosize = TRUE,
                   margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
-      layout(legend = list(x = 0.030, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))%>% layout(yaxis2=list(fixedrange=TRUE))
     
     
   })
+  
+  
+  ##### Test ve Vaka Büyüme Oranları ####
+  
+  output$plotTestCaseGrowt <- renderPlotly({
+    
+    time = seq(1:nrow(dataset()))
+    time2 = time[10:length(time)]
+    
+    library(plotly)
+    fig <- plot_ly(x = time2, y = dataset()[,"Vaka Değişim Oranı (%)"][10:length(time)], name = 'Vaka Artış  (%)', type = 'scatter', mode = 'lines+markers') 
+    fig <- fig %>% add_trace(y =dataset()[,"Test Değişim Oranı (%)"][10:length(time)], name = 'Test Artış  (%)', mode = 'lines+markers',
+                             line = list(color = "red"), marker = list(color = 'red',line = list(color = 'red'))) 
+    
+    fig%>% layout(title = "<b>Toplam Test ve Vaka Artış Oranları</b>", xaxis = list(title = "Gün"), 
+                  yaxis=list(title = "Artış Oranı (%)"), showlegend = TRUE, autosize = TRUE,
+                  margin = list(l=50, r=50, b=0, t=50, pad=4))%>% 
+      layout(legend = list(x = 0.040, y = 0.9))%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+  })
+  
+  
   
    ##### Günlük Yeni Vakalar ####
 
@@ -784,16 +930,35 @@ server <- function(input, output, session) {
   output$countryTable <- DT::renderDataTable({
 
 
-    dataComparedCountries = dataWorld()[[3]][dataWorld()[[3]]$Country %in% input$countries,]
-    colnames(dataComparedCountries) = c("Ülke", "Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen")
+    dataComparedCountries = dataWorld()[[4]][dataWorld()[[4]]$Country %in% input$countries,]
+    colnames(dataComparedCountries) = c("Ülke", "Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen", "Yeni Vaka", "Yeni Ölüm", "Yeni İyileşme",
+                                        "Vaka Sıklığı (Milyonda)", "Ölüm Sıklığı (Milyonda)", "İyileşme Sıklığı (Milyonda)", "Nüfus", 
+                                        "Yıllık Değişim", "Net Değişim", "Yoğunluk", "Yüzölüçümü", "Doğurganlık Oranı", "Ortanca Yaş",
+                                        "Şehir Nüfusu", "Dünya Nüfusundaki Payı")
 
-
-    allConfirmed = sum(dataWorld()[[3]]$MaxConfirmed, na.rm=TRUE)
-    allDeaths = sum(dataWorld()[[3]]$MaxDeaths, na.rm=TRUE)
+    
+    allConfirmed = sum(dataWorld()[[3]]$MaxConfirmed[!is.na(dataWorld()[[3]]$MaxConfirmed) & !is.infinite(dataWorld()[[3]]$MaxConfirmed)], na.rm=TRUE)
+    allDeaths = sum(dataWorld()[[3]]$MaxDeaths[!is.na(dataWorld()[[3]]$MaxDeaths) & !is.infinite(dataWorld()[[3]]$MaxDeaths)], na.rm=TRUE)
     allRecovered = sum(dataWorld()[[3]]$MaxRecovered[!is.infinite(dataWorld()[[3]]$MaxRecovered)], na.rm=TRUE)
+    
+    allNewCases = sum(dataWorld()[[3]]$NewCases[!is.na(dataWorld()[[3]]$NewCases) & !is.infinite(dataWorld()[[3]]$NewCases)], na.rm=TRUE)
+    allNewDeaths = sum(dataWorld()[[3]]$NewDeaths[!is.na(dataWorld()[[3]]$NewDeaths) & !is.infinite(dataWorld()[[3]]$NewDeaths)], na.rm=TRUE)
+    allNewRecovered = sum(dataWorld()[[3]]$NewRecovered[!is.na(dataWorld()[[3]]$NewRecovered) & !is.infinite(dataWorld()[[3]]$NewRecovered)], na.rm=TRUE)
+    
+    worldPopulation = 7777586140
+    worldAdjustedCase = round(1000000/(worldPopulation/allConfirmed),0)
+    worldAdjustedDeaths = round(1000000/(worldPopulation/allDeaths),0)
+    worldpopAdjustedRecovered = round(1000000/(worldPopulation/allRecovered),0)
+    
 
-    world = cbind.data.frame("Global", allConfirmed, allDeaths, allRecovered)
-    colnames(world) = c("Ülke", "Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen")
+    
+    
+    world = cbind.data.frame("Global", allConfirmed, allDeaths, allRecovered, allNewCases,allNewDeaths,allNewRecovered,worldAdjustedCase
+                             ,worldAdjustedDeaths,worldpopAdjustedRecovered,worldPopulation,NA,NA,NA,NA,NA,NA,NA,NA)
+    colnames(world) = c("Ülke", "Toplam Vaka", "Toplam Ölüm", "Toplam İyileşen", "Yeni Vaka", "Yeni Ölüm", "Yeni İyileşme",
+                        "Vaka Sıklığı (Milyonda)", "Ölüm Sıklığı (Milyonda)", "İyileşme Sıklığı (Milyonda)", "Nüfus", 
+                        "Yıllık Değişim", "Net Değişim", "Yoğunluk", "Yüzölüçümü", "Doğurganlık Oranı", "Ortanca Yaş",
+                        "Şehir Nüfusu", "Dünya Nüfusundaki Payı")
 
     dataComparedCountries = as.data.frame(rbind.data.frame(world, dataComparedCountries))
     dataComparedCountries = dataComparedCountries[order(dataComparedCountries[,"Toplam Vaka"], decreasing = TRUE),]
@@ -801,12 +966,170 @@ server <- function(input, output, session) {
 
     datatable(dataComparedCountries,
               extensions = c('Buttons','KeyTable', 'Responsive'),
-              rownames= FALSE,options = list(columnDefs = list(list(className = 'dt-center',targets='_all')),pageLength = 100, info = FALSE,bFilter = FALSE, paging = FALSE, dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),
+              rownames= FALSE,options = list(columnDefs = list(list(className = 'dt-center',targets='_all')),pageLength = 100, info = TRUE,bFilter = TRUE, paging = FALSE, 
+                        dom = 'Bfrtip',buttons = list(list(extend = 'collection',buttons = c('csv', 'excel', 'pdf'),
                                                                                                                                                                                             text = 'İndir')), keys = TRUE
     ))
 
   })
 
+  
+  #### Ülke İstatistikleri Grafiği ##########
+  
+  output$worldStatistics <- renderPlotly({
+    
+    data2 = dataWorld()[[3]] 
+    
+    
+    plotData = data2[(data2$Country %in% input$countries),]
+    
+    head(plotData)
+    
+    fig1 <- plot_ly(x = plotData$MaxConfirmed, y = ~reorder(plotData$Country, plotData$MaxConfirmed), name = 'Toplam Vaka',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#6093ca',
+                                  line = list(color = '#6093ca', width = 1))) 
+    
+    # fig1 <- fig1 %>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = TRUE, domain= c(0, 0.85)),
+    #                         xaxis = list(zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE)) 
+    fig1 <- fig1 %>% add_annotations(xref = 'x1', yref = 'y',
+                                     x = plotData$MaxConfirmed * 0.95 + 10000,  y = plotData$Country,
+                                     text = paste(round(plotData$MaxConfirmed, 2)),
+                                     font = list(family = 'Arial', size = 12, color = 'black'),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    fig1
+    
+    
+    fig2 <- plot_ly(x = plotData$MaxRecovered, y = ~reorder(plotData$Country, plotData$MaxConfirmed), name = 'Toplam İyileşen',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#77dd77',
+                                  line = list(color = '#77dd77', width = 1))) 
+    
+    
+    fig2 <- fig2 %>% add_annotations(xref = 'x', yref = 'y',
+                                     x = plotData$MaxRecovered * 1.0 + 1500,  y = plotData$Country,
+                                     text = paste(round(plotData$MaxRecovered, 2)),
+                                     font = list(family = 'Arial', size = 12),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    fig2
+    
+    
+    fig3 <- plot_ly(x = plotData$MaxDeaths, y = ~reorder(plotData$Country, plotData$MaxConfirmed), name = 'Toplam Ölüm',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#ff6961',
+                                  line = list(color = '#ff6961', width = 1))) 
+    
+    
+    fig3 <- fig3 %>% add_annotations(xref = 'x', yref = 'y',
+                                     x = plotData$MaxDeaths * 1.0 + 1500,  y = plotData$Country,
+                                     text = paste(round(plotData$MaxDeaths, 2)),
+                                     font = list(family = 'Arial', size = 12),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    fig3
+    
+    fig <- subplot(fig1, fig2, fig3) 
+    
+    fig <- fig %>% layout(title = 'Mutlak sayı*', font = list(size=11),
+                          legend = list(x = 0.009, y = 10.038,
+                                        font = list(size = 12)),
+                          margin = list(l = 100, r = 20, t = 70, b = 70),
+                          paper_bgcolor = 'rgb(248, 248, 255)',
+                          plot_bgcolor = 'rgb(248, 248, 255)')
+    
+    fig <- fig %>% add_annotations(xref = 'paper', yref = 'paper',
+                                   x = 0, y = -0.15,
+                                   text = paste('*Ülkelerin toplam vaka, iyileşen ve ölüm sayıları'),
+                                   font = list(family = 'Arial', size = 10, color = 'rgb(150,150,150)'),
+                                   showarrow = FALSE)
+    
+    fig%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+  })
+  
+  output$worldStatisticsPopAdjusted <- renderPlotly({
+    
+    data2 = dataWorld()[[4]] 
+    
+    
+    plotData = data2[(data2$Country %in% input$countries),]
+    
+    head(plotData)
+    
+    fig1 <- plot_ly(x = plotData$popAdjustedCase, y = ~reorder(plotData$Country, plotData$popAdjustedCase), name = 'Vaka Sıklığı',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#6093ca',
+                                  line = list(color = '#6093ca', width = 1))) 
+    
+    # fig1 <- fig1 %>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = TRUE, domain= c(0, 0.85)),
+    #                         xaxis = list(zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE)) 
+    fig1 <- fig1 %>% add_annotations(xref = 'x1', yref = 'y',
+                                     x = plotData$popAdjustedCase * 0.95 + 100,  y = plotData$Country,
+                                     text = paste(round(plotData$popAdjustedCase, 2)),
+                                     font = list(family = 'Arial', size = 12, color = 'black'),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    fig1
+    
+    
+    fig2 <- plot_ly(x = plotData$popAdjustedRecovered, y = ~reorder(plotData$Country, plotData$popAdjustedCase), name = 'İyileşen Sıklığı',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#77dd77',
+                                  line = list(color = '#77dd77', width = 1))) 
+    
+    
+    fig2 <- fig2 %>% add_annotations(xref = 'x', yref = 'y',
+                                     x = plotData$popAdjustedRecovered * 1.0 + 100,  y = plotData$Country,
+                                     text = paste(round(plotData$popAdjustedRecovered, 2)),
+                                     font = list(family = 'Arial', size = 12),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    fig2
+    
+    
+    fig3 <- plot_ly(x = plotData$popAdjustedDeaths, y = ~reorder(plotData$Country, plotData$popAdjustedCase), name = 'Ölüm Sıklığı',
+                    type = 'bar', orientation = 'h',
+                    marker = list(color = '#ff6961',
+                                  line = list(color = '#ff6961', width = 1))) 
+    
+    
+    fig3 <- fig3 %>% add_annotations(xref = 'x', yref = 'y',
+                                     x = plotData$popAdjustedDeaths * 1.0 + 10,  y = plotData$Country,
+                                     text = paste(round(plotData$popAdjustedDeaths, 2)),
+                                     font = list(family = 'Arial', size = 12),
+                                     showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+    fig3
+    
+    fig <- subplot(fig1, fig2, fig3) 
+    
+    
+    fig <- fig %>% layout(title = 'Nüfusa göre düzeltilmiş*', font = list(size=11),
+                          legend = list(x = 0.009, y = 10.038,
+                                        font = list(size = 12)),
+                          margin = list(l = 100, r = 20, t = 70, b = 70),
+                          paper_bgcolor = 'rgb(248, 248, 255)',
+                          plot_bgcolor = 'rgb(248, 248, 255)')
+    
+    fig <- fig %>% add_annotations(xref = 'paper', yref = 'paper',
+                                   x = 0, y = -0.15,
+                                   text = paste('*Ülkelerin 1 milyon nüfustaki toplam vaka, iyileşen ve ölüm sıklıkları'),
+                                   font = list(family = 'Arial', size = 10, color = 'rgb(150,150,150)'),
+                                   showarrow = FALSE)
+    
+    fig%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
+  })
+  
+  
   #### Ülke vaka karşılaştırması #####
   output$compareConfirmed <- renderPlot({
     options(scipen=999)
@@ -896,11 +1219,21 @@ server <- function(input, output, session) {
 
         if(input$logTransform){
 
+          if("US" %in% input$countries){
+          
           breakPoints = c(input$firstCase,input$firstCase+input$firstCase, input$firstCase+input$firstCase*4,
           input$firstCase+input$firstCase*9,input$firstCase+input$firstCase*19,input$firstCase+input$firstCase*49
           ,input$firstCase+input$firstCase*99,input$firstCase+input$firstCase*199,input$firstCase+input$firstCase*499
-          ,input$firstCase+input$firstCase*999)
+          ,input$firstCase+input$firstCase*999,input$firstCase+input$firstCase*2499,input$firstCase+input$firstCase*4999)
 
+          }else{
+            
+            breakPoints = c(input$firstCase,input$firstCase+input$firstCase, input$firstCase+input$firstCase*4,
+                            input$firstCase+input$firstCase*9,input$firstCase+input$firstCase*19,input$firstCase+input$firstCase*49
+                            ,input$firstCase+input$firstCase*99,input$firstCase+input$firstCase*199,input$firstCase+input$firstCase*499
+                            ,input$firstCase+input$firstCase*999, input$firstCase+input$firstCase*1499)
+            
+          }
           lim = c(min(compareData$Confirmed),max(compareData$Confirmed))
 
           }else{
@@ -917,8 +1250,8 @@ server <- function(input, output, session) {
           theme(text = element_text(size=14),legend.title=element_blank())+
           theme(legend.position="bottom") +scale_y_continuous(trans = transform,
                                                               breaks = breakPoints,
-                                                               limits = lim)+
-        scale_x_continuous(limits = c(0,50))
+                                                               limits = lim)#+
+        #scale_x_continuous(limits = c(0,50))
 
 
       if(input$trajectory){
@@ -1112,7 +1445,7 @@ server <- function(input, output, session) {
           breakPoints = c(input$firstDeath,input$firstDeath+input$firstDeath, input$firstDeath+input$firstDeath*4,
                           input$firstDeath+input$firstDeath*9,input$firstDeath+input$firstDeath*19,input$firstDeath+input$firstDeath*49
                           ,input$firstDeath+input$firstDeath*99,input$firstDeath+input$firstDeath*199,input$firstDeath+input$firstDeath*499
-                          ,input$firstDeath+input$firstDeath*999)
+                          ,input$firstDeath+input$firstDeath*999,input$firstDeath+input$firstDeath*1999,input$firstDeath+input$firstDeath*3999)
           lim = c(min(compareData$Deaths),max(compareData$Deaths))
 
         }else{
@@ -1130,8 +1463,8 @@ server <- function(input, output, session) {
           theme(text = element_text(size=14),legend.title=element_blank())+
           theme(legend.position="bottom") +
           scale_y_continuous(trans = transform, breaks = breakPoints,
-                             limits = lim)+
-        scale_x_continuous(limits = c(0,50))
+                             limits = lim)#+
+        #scale_x_continuous(limits = c(0,50))
 
 
 
@@ -1235,252 +1568,253 @@ server <- function(input, output, session) {
   })
 
   #### Ülke iyileşme karşılaştırması #####
-  output$compareRecovered <- renderPlot({
-
-
-
-      compareData = comparedCountries()
-      maxLimit = max(compareData$Recovered)
-      splitCompareData = split(compareData, compareData$Country)
-
-      for(counts in 1:length(unique(compareData$Country))){
-
-        if(max(splitCompareData[[counts]]$Recovered) > input$firstRecover){
-
-          tmp = splitCompareData[[counts]]
-          tmp2 = dplyr::filter(tmp, tmp$Recovered >= input$firstRecover)
-          indx = which(splitCompareData[[counts]]$Date == tmp2$Date[1])-1
-          splitCompareData[[counts]] = splitCompareData[[counts]][indx:nrow(splitCompareData[[counts]]),]
-          # splitCompareData[[counts]]$Recovered[[1]]  = input$firstRecover
-          splitCompareData[[counts]]$logConfirmed[[1]] = log(input$firstRecover)
-          splitCompareData[[counts]]$Days = 0:(nrow(data.frame(splitCompareData[[counts]]))-1)
-
-        }else{
-
-          splitCompareData[[counts]] = NA
-        }
-
-      }
-
-      na.omit.list <- function(y) { return(y[!sapply(y, function(x) all(is.na(x)))]) }
-      compareData = rbindlist(na.omit.list(splitCompareData))
-
-      round.choose <- function(x, roundTo, dir = 1) {
-        if(dir == 1) {  ##ROUND UP
-          x + (roundTo - x %% roundTo)
-        } else {
-          if(dir == 0) {  ##ROUND DOWN
-            x - (x %% roundTo)
-          }
-        }
-      }
-      if(input$firstRecover > 0){
-        xlabel = paste0(input$firstRecover,". İyileşmeden Sonra Geçen Gün")
-      }else{
-        xlabel = "Gün"
-      }
-
-      # }
-
-        yValues = seq(input$firstRecover,(max(compareData$Recovered)+max(compareData$Recovered)/8),
-                      (max(compareData$Recovered)-input$firstRecover)/5)
-
-        if(max(yValues) <= 100){
-
-          roundValue = 10
-
-        }
-
-        if(max(yValues) <= 1000 && max(yValues) > 100 ){
-
-          roundValue = 100
-
-        }
-
-        if(max(yValues) <= 10000 && max(yValues) > 1000){
-
-          roundValue = 1000
-
-        }
-
-        if(max(yValues) <= 100000 && max(yValues) > 10000){
-
-          roundValue = 10000
-
-        }
-
-
-        if(max(yValues) > 1000000){
-
-          roundValue = 50000
-
-        }
-
-
-
-        yValues = c(yValues[[1]],round.choose(yValues[-1]-yValues[[1]], roundTo = roundValue, 1))
-
-        transform = ifelse(input$logTransform,"log", "identity")
-        gtitle = ifelse(input$logTransform,"Ülkelerin Toplam Resmi İyileşme Sayıları (Log)", "Ülkelerin Toplam Resmi İyileşme Sayıları")
-
-        if(input$logTransform){
-
-          breakPoints = c(input$firstRecover,input$firstRecover+input$firstRecover, input$firstRecover+input$firstRecover*4,
-                          input$firstRecover+input$firstRecover*9,input$firstRecover+input$firstRecover*19,input$firstRecover+input$firstRecover*49
-                          ,input$firstRecover+input$firstRecover*99,input$firstRecover+input$firstRecover*199,input$firstRecover+input$firstRecover*499
-                          ,input$firstRecover+input$firstRecover*999,input$firstRecover+input$firstRecover*1999
-
-                          )
-
-          lim = c(min(compareData$Recover),maxLimit)
-
-        }else{
-
-          breakPoints = waiver()
-          lim = c(input$firstRecover,maxLimit)
-
-        }
-
-       p =  ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1) +
-          geom_point(aes(colour=Country), size=2) +  xlab(xlabel) + ylab("Toplam İyileşme") +
-          scale_colour_discrete("Ülke")+ ggtitle(gtitle)+
-          theme(text = element_text(size=14),legend.title=element_blank())+
-          theme(legend.position="bottom") +
-          scale_y_continuous(trans = transform, breaks = breakPoints,
-                             limits = c(input$firstRecover,maxLimit))+
-         scale_x_continuous(limits = c(0,50))
-
-
-       if(input$trajectory){
-       d = (input$firstRecover)*2^(1:max(compareData$Days))
-       d = c(input$firstRecover, d[1:max(compareData$Days)])
-
-       doublingEveryDay =  cbind.data.frame(Country = rep("2'ye katlanma (her gün)", length(d)), Confirmed = d,
-                                            Days = 0:(length(d)-1))
-
-
-       d2 = (input$firstRecover)*1.4142137^(1:max(compareData$Days))
-       d2 = c(input$firstRecover, d2[1:max(compareData$Days)])
-
-       doublingEveryTwoDays =  cbind.data.frame(Country = rep("2'ye katlanma (2 günde bir)", length(d2)), Confirmed = d2,
-                                                Days = 0:(length(d2)-1))
-
-
-       d3 = (input$firstRecover)*1.259921^(1:max(compareData$Days))
-       d3 = c(input$firstRecover, d3[1:max(compareData$Days)])
-
-       doublingEveryThreeDays =  cbind.data.frame(Country = rep("2'ye katlanma (3 günde bir)", length(d3)), Confirmed = d3,
-                                                  Days = 0:(length(d3)-1))
-
-
-       d7 = (input$firstRecover)*1.10408955^(1:max(compareData$Days))
-       d7 = c(input$firstRecover, d7[1:max(compareData$Days)])
-
-       doublingEveryWeek =  cbind.data.frame(Country = rep("2'ye katlanma (haftada bir)", length(d7)), Confirmed = d7,
-                                             Days = 0:(length(d7)-1))
-
-
-
-       doublingData = plyr::rbind.fill(doublingEveryDay, doublingEveryTwoDays,doublingEveryThreeDays, doublingEveryWeek)
-
-
-       p2 = p + geom_line(data =doublingData, aes(y=Confirmed, fill=Country),size=1, linetype="dashed")
-
-
-       pg <- ggplot_build(p2)
-       coordinates = pg$data[[3]]
-
-       splitCoordinates = split(coordinates,coordinates$group)
-
-       coordinateValues = matrix(NA,nrow=4,ncol=2)
-
-
-       for(coord in 1:length(splitCoordinates)){
-
-         df = splitCoordinates[[coord]][-c(9,10)]
-         df2 = df[complete.cases(df),]
-
-         coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
-         coordinateValues[coord,2] = max(df2$x)
-
-       }
-
-if(input$highlightCountry){
-       p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
-                     color="black")+
-         annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
-                  color="black")+
-         annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
-                  color="black")+
-         annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
-                  color="black")+
-         gghighlight(compareData$Country == input$highlightCountries, keep_scales = TRUE, use_direct_label = TRUE)
-
-}else{
-
-  p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
-                color="black")+
-    annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
-             color="black")+
-    annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
-             color="black")+
-    annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
-             color="black")
-}
-       }else{
-
-         if(input$highlightCountry){
-           p + gghighlight(compareData$Country == input$highlightCountries, keep_scales = TRUE, use_direct_label = TRUE)
-         }else{
-
-           p
-         }
-
-       }
-
-
-
-
-  })
+#   output$compareRecovered <- renderPlot({
+# 
+# 
+# 
+#       compareData = comparedCountries()
+#       maxLimit = max(compareData$Recovered)
+#       splitCompareData = split(compareData, compareData$Country)
+# 
+#       for(counts in 1:length(unique(compareData$Country))){
+# 
+#         if(max(splitCompareData[[counts]]$Recovered) > input$firstRecover){
+# 
+#           tmp = splitCompareData[[counts]]
+#           tmp2 = dplyr::filter(tmp, tmp$Recovered >= input$firstRecover)
+#           indx = which(splitCompareData[[counts]]$Date == tmp2$Date[1])-1
+#           splitCompareData[[counts]] = splitCompareData[[counts]][indx:nrow(splitCompareData[[counts]]),]
+#           # splitCompareData[[counts]]$Recovered[[1]]  = input$firstRecover
+#           splitCompareData[[counts]]$logConfirmed[[1]] = log(input$firstRecover)
+#           splitCompareData[[counts]]$Days = 0:(nrow(data.frame(splitCompareData[[counts]]))-1)
+# 
+#         }else{
+# 
+#           splitCompareData[[counts]] = NA
+#         }
+# 
+#       }
+# 
+#       na.omit.list <- function(y) { return(y[!sapply(y, function(x) all(is.na(x)))]) }
+#       compareData = rbindlist(na.omit.list(splitCompareData))
+# 
+#       round.choose <- function(x, roundTo, dir = 1) {
+#         if(dir == 1) {  ##ROUND UP
+#           x + (roundTo - x %% roundTo)
+#         } else {
+#           if(dir == 0) {  ##ROUND DOWN
+#             x - (x %% roundTo)
+#           }
+#         }
+#       }
+#       if(input$firstRecover > 0){
+#         xlabel = paste0(input$firstRecover,". İyileşmeden Sonra Geçen Gün")
+#       }else{
+#         xlabel = "Gün"
+#       }
+# 
+#       # }
+# 
+#         yValues = seq(input$firstRecover,(max(compareData$Recovered)+max(compareData$Recovered)/8),
+#                       (max(compareData$Recovered)-input$firstRecover)/5)
+# 
+#         if(max(yValues) <= 100){
+# 
+#           roundValue = 10
+# 
+#         }
+# 
+#         if(max(yValues) <= 1000 && max(yValues) > 100 ){
+# 
+#           roundValue = 100
+# 
+#         }
+# 
+#         if(max(yValues) <= 10000 && max(yValues) > 1000){
+# 
+#           roundValue = 1000
+# 
+#         }
+# 
+#         if(max(yValues) <= 100000 && max(yValues) > 10000){
+# 
+#           roundValue = 10000
+# 
+#         }
+# 
+# 
+#         if(max(yValues) > 1000000){
+# 
+#           roundValue = 50000
+# 
+#         }
+# 
+# 
+# 
+#         yValues = c(yValues[[1]],round.choose(yValues[-1]-yValues[[1]], roundTo = roundValue, 1))
+# 
+#         transform = ifelse(input$logTransform,"log", "identity")
+#         gtitle = ifelse(input$logTransform,"Ülkelerin Toplam Resmi İyileşme Sayıları (Log)", "Ülkelerin Toplam Resmi İyileşme Sayıları")
+# 
+#         if(input$logTransform){
+# 
+#           breakPoints = c(input$firstRecover,input$firstRecover+input$firstRecover, input$firstRecover+input$firstRecover*4,
+#                           input$firstRecover+input$firstRecover*9,input$firstRecover+input$firstRecover*19,input$firstRecover+input$firstRecover*49
+#                           ,input$firstRecover+input$firstRecover*99,input$firstRecover+input$firstRecover*199,input$firstRecover+input$firstRecover*499
+#                           ,input$firstRecover+input$firstRecover*999,input$firstRecover+input$firstRecover*1999
+# 
+#                           )
+# 
+#           lim = c(min(compareData$Recover),maxLimit)
+# 
+#         }else{
+# 
+#           breakPoints = waiver()
+#           lim = c(input$firstRecover,maxLimit)
+# 
+#         }
+# 
+#        p =  ggplot(data = compareData, aes(x=Days, y=Recovered)) + geom_line(aes(colour=Country),size = 1) +
+#           geom_point(aes(colour=Country), size=2) +  xlab(xlabel) + ylab("Toplam İyileşme") +
+#           scale_colour_discrete("Ülke")+ ggtitle(gtitle)+
+#           theme(text = element_text(size=14),legend.title=element_blank())+
+#           theme(legend.position="bottom") +
+#           scale_y_continuous(trans = transform, breaks = breakPoints,
+#                              limits = c(input$firstRecover,maxLimit))+
+#          scale_x_continuous(limits = c(0,50))
+# 
+# 
+#        if(input$trajectory){
+#        d = (input$firstRecover)*2^(1:max(compareData$Days))
+#        d = c(input$firstRecover, d[1:max(compareData$Days)])
+# 
+#        doublingEveryDay =  cbind.data.frame(Country = rep("2'ye katlanma (her gün)", length(d)), Confirmed = d,
+#                                             Days = 0:(length(d)-1))
+# 
+# 
+#        d2 = (input$firstRecover)*1.4142137^(1:max(compareData$Days))
+#        d2 = c(input$firstRecover, d2[1:max(compareData$Days)])
+# 
+#        doublingEveryTwoDays =  cbind.data.frame(Country = rep("2'ye katlanma (2 günde bir)", length(d2)), Confirmed = d2,
+#                                                 Days = 0:(length(d2)-1))
+# 
+# 
+#        d3 = (input$firstRecover)*1.259921^(1:max(compareData$Days))
+#        d3 = c(input$firstRecover, d3[1:max(compareData$Days)])
+# 
+#        doublingEveryThreeDays =  cbind.data.frame(Country = rep("2'ye katlanma (3 günde bir)", length(d3)), Confirmed = d3,
+#                                                   Days = 0:(length(d3)-1))
+# 
+# 
+#        d7 = (input$firstRecover)*1.10408955^(1:max(compareData$Days))
+#        d7 = c(input$firstRecover, d7[1:max(compareData$Days)])
+# 
+#        doublingEveryWeek =  cbind.data.frame(Country = rep("2'ye katlanma (haftada bir)", length(d7)), Confirmed = d7,
+#                                              Days = 0:(length(d7)-1))
+# 
+# 
+# 
+#        doublingData = plyr::rbind.fill(doublingEveryDay, doublingEveryTwoDays,doublingEveryThreeDays, doublingEveryWeek)
+# 
+# 
+#        p2 = p + geom_line(data =doublingData, aes(y=Confirmed, fill=Country),size=1, linetype="dashed")
+# 
+# 
+#        pg <- ggplot_build(p2)
+#        coordinates = pg$data[[3]]
+# 
+#        splitCoordinates = split(coordinates,coordinates$group)
+# 
+#        coordinateValues = matrix(NA,nrow=4,ncol=2)
+# 
+# 
+#        for(coord in 1:length(splitCoordinates)){
+# 
+#          df = splitCoordinates[[coord]][-c(9,10)]
+#          df2 = df[complete.cases(df),]
+# 
+#          coordinateValues[coord,1] = ifelse(input$logTransform, exp(max(df2$y)),max(df2$y))
+#          coordinateValues[coord,2] = max(df2$x)
+# 
+#        }
+# 
+# if(input$highlightCountry){
+#        p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
+#                      color="black")+
+#          annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
+#                   color="black")+
+#          annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
+#                   color="black")+
+#          annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
+#                   color="black")+
+#          gghighlight(compareData$Country == input$highlightCountries, keep_scales = TRUE, use_direct_label = TRUE)
+# 
+# }else{
+# 
+#   p2 + annotate(geom="text", size=3, x=coordinateValues[1,2], y=coordinateValues[1,1], label="Her gün 2 katı",
+#                 color="black")+
+#     annotate(geom="text", size=3, x=coordinateValues[2,2], y=coordinateValues[2,1], label="2 günde 2 katı",
+#              color="black")+
+#     annotate(geom="text", size=3, x=coordinateValues[3,2], y=coordinateValues[3,1], label="3 günde 2 katı",
+#              color="black")+
+#     annotate(geom="text", size=3, x=coordinateValues[4,2], y=coordinateValues[4,1], label="Haftada 2 katı",
+#              color="black")
+# }
+#        }else{
+# 
+#          if(input$highlightCountry){
+#            p + gghighlight(compareData$Country == input$highlightCountries, keep_scales = TRUE, use_direct_label = TRUE)
+#          }else{
+# 
+#            p
+#          }
+# 
+#        }
+# 
+# 
+# 
+# 
+#   })
 
   #### Ülke test karşılaştırması #####
-  output$testComparisonPlot <- renderPlot({
+  # output$testComparisonPlot <- renderPlot({
+  # 
+  #   ggplot(dataTest(), aes(x=Tests, y=Positive)) +
+  #     geom_point() +
+  #     ggrepel::geom_text_repel(aes(label = Country))+
+  #     xlab("Test Sayısı") + ylab("Vaka Sayısı")+
+  #     scale_y_continuous(breaks = seq(0,175000,25000))+
+  #     scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Test Sayıları ve Vaka Sayıları")+
+  #     theme(text = element_text(size=14),legend.title=element_blank())
+  # 
+  # 
+  # })
 
-    ggplot(dataTest(), aes(x=Tests, y=Positive)) +
-      geom_point() +
-      ggrepel::geom_text_repel(aes(label = Country))+
-      xlab("Test Sayısı") + ylab("Vaka Sayısı")+
-      scale_y_continuous(breaks = seq(0,175000,25000))+
-      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Test Sayıları ve Vaka Sayıları")+
-      theme(text = element_text(size=14),legend.title=element_blank())
-
-
-  })
-
-  #### Ülke milyon nüfusta test karşılaştırması #####
-  output$testComparisonPopAdjustedPlot <- renderPlot({
-
-    ggplot(dataTest(), aes(x=Test_million_population, y=Positive)) +
-      geom_point() +
-      ggrepel::geom_text_repel(aes(label = Country))+
-      xlab("Test Sayısı/1 Milyon Nüfus") + ylab("Vaka Sayısı")+
-      scale_y_continuous(breaks = seq(0,175000,25000))+
-      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin 1 Milyon Nüfusta Test Sayıları ve Vaka Sayıları")+
-      theme(text = element_text(size=14),legend.title=element_blank())
-
-
-
-  })
+  # #### Ülke milyon nüfusta test karşılaştırması #####
+  # output$testComparisonPopAdjustedPlot <- renderPlot({
+  # 
+  #   ggplot(dataTest(), aes(x=Test_million_population, y=Positive)) +
+  #     geom_point() +
+  #     ggrepel::geom_text_repel(aes(label = Country))+
+  #     xlab("Test Sayısı/1 Milyon Nüfus") + ylab("Vaka Sayısı")+
+  #     scale_y_continuous(breaks = seq(0,175000,25000))+
+  #     scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin 1 Milyon Nüfusta Test Sayıları ve Vaka Sayıları")+
+  #     theme(text = element_text(size=14),legend.title=element_blank())
+  # 
+  # 
+  # 
+  # })
 
   #### Ülkelerin normalize edilmiş test/vaka karşılaştırması #####
   output$testComparisonPopTestAdjustedPlot <- renderPlot({
 
-    ggplot(dataTest(), aes(x=Test_million_population, y=Positive_Thousand_Test)) +
+    ggplot(dataTest(), aes(x=Test_million_population, y=Positive_million_population)) +
       geom_point() +
       ggrepel::geom_text_repel(aes(label = Country))+
-      xlab("Test Sayısı/1 Milyon Nüfus") + ylab("Vaka Sayısı/Bin Test")+
-      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Test Sayısı ve Vaka Sayısı Karşılaştırması")+
-      theme(text = element_text(size=14),legend.title=element_blank())
+      xlab("Test Sıklığı (Milyonda)") + ylab("Vaka Sıklığı (Milyonda)")+
+      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Vaka ve Test Sıklığı Karşılaştırması")+
+      theme(text = element_text(size=14),legend.title=element_blank())+ 
+      geom_smooth(method='lm')
 
 
 
@@ -1492,22 +1826,22 @@ if(input$highlightCountry){
     plotData = dataTest()
     
     
-    fig1 <- plot_ly(x = plotData$Positive_Thousand_Test, y = ~reorder(plotData$Country, plotData$Positive_Thousand_Test), name = 'Vaka Sayısı (Bin Test)',
-                    type = 'bar', orientation = 'h',
+    fig1 <- plot_ly(x = plotData$Positive_million_population, y = ~reorder(plotData$Country, plotData$Positive_million_population), name = 'Vaka Sıklığı (Milyonda)',
+                    type = 'bar', orientation = 'h', height = 700,
                     marker = list(color = 'rgba(50, 171, 96, 0.6)',
                                   line = list(color = 'rgba(50, 171, 96, 1.0)', width = 1))) 
     
     fig1 <- fig1 %>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = TRUE, domain= c(0, 0.85)),
                             xaxis = list(zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE)) 
     fig1 <- fig1 %>% add_annotations(xref = 'x1', yref = 'y',
-                                     x = plotData$Positive_Thousand_Test * 1.05 + 10,  y = plotData$Country,
-                                     text = paste(round(plotData$Positive_Thousand_Test, 2)),
+                                     x = plotData$Positive_million_population * 0.75 + 10,  y = plotData$Country,
+                                     text = paste(round(plotData$Positive_million_population, 2)),
                                      font = list(family = 'Arial', size = 12, color = 'rgb(50, 171, 96)'),
                                      showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
     
     
     
-    fig2 <- plot_ly(x = plotData$Test_million_population, y = ~reorder(plotData$Country, plotData$Positive_Thousand_Test), name = 'Test Sayısı (Milyonda)',
+    fig2 <- plot_ly(x = plotData$Test_million_population, y = ~reorder(plotData$Country, plotData$Positive_million_population), name = 'Test Sıklığı (Milyonda)',
                     type = 'bar', orientation = 'h') 
     
     fig2 <- fig2%>% layout(yaxis = list(showgrid = FALSE, showline = FALSE, showticklabels = FALSE, domain= c(0, 0.85)),
@@ -1515,7 +1849,7 @@ if(input$highlightCountry){
     
     
     fig2 <- fig2 %>% add_annotations(xref = 'x', yref = 'y',
-                                     x = plotData$Test_million_population * 1.3 + 1150,  y = plotData$Country,
+                                     x = plotData$Test_million_population * 1.0 + 1150,  y = plotData$Country,
                                      text = paste(round(plotData$Test_million_population, 2)),
                                      font = list(family = 'Arial', size = 12),
                                      showarrow = FALSE)%>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
@@ -1525,7 +1859,7 @@ if(input$highlightCountry){
     
     fig <- subplot(fig1, fig2) 
     
-    fig <- fig %>% layout(title = 'Vaka Sayısı (Bin Test) ve Test Sayısı (Milyonda)', font = list(size=11),
+    fig <- fig %>% layout(title = 'Vaka ve Test Sıklığı (Milyonda)*', font = list(size=11),
                           legend = list(x = 0.029, y = 1.038,
                                         font = list(size = 12)),
                           margin = list(l = 100, r = 20, t = 70, b = 70),
@@ -1534,11 +1868,13 @@ if(input$highlightCountry){
     
     fig <- fig %>% add_annotations(xref = 'paper', yref = 'paper',
                                    x = 0, y = -0.15,
-                                   text = paste('Ülkelerin 6-7 Nisan 2020 tarihleri arasındaki verileri kullanılarak oluşturulmuştur.'),
+                                   text = paste('*27 Nisan-1 Mayıs 2020 arasındaki veriler kullanılmıştır.'),
                                    font = list(family = 'Arial', size = 10, color = 'rgb(150,150,150)'),
                                    showarrow = FALSE)
     
     fig%>% config(displayModeBar = F) %>% layout(xaxis=list(fixedrange=TRUE)) %>% layout(yaxis=list(fixedrange=TRUE))
+    
+    
     
     
   })
@@ -1557,8 +1893,7 @@ if(input$highlightCountry){
     
     for(counts in 1:length(splitData)){
       
-      print(counts)
-      
+
       if(max(splitData[[counts]]$Confirmed) > firstCase){
         tmp = splitData[[counts]]
         tmp2 = dplyr::filter(tmp, tmp$Confirmed >= firstCase)
@@ -1636,7 +1971,7 @@ if(input$highlightCountry){
       scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Ortalama Haftalık Toplam Vaka Değişimi")+
       theme(text = element_text(size=14),legend.title=element_blank())+
       theme(legend.position="bottom") +
-      scale_x_continuous(limits = c(0,50))+
+      #scale_x_continuous(limits = c(0,50))+
       gghighlight(newGrowthData2$Country == input$highlightCountries, keep_scales = TRUE, use_direct_label = TRUE)
       
     }else{
@@ -1645,8 +1980,8 @@ if(input$highlightCountry){
         geom_point(aes(colour=Country), size=2) + ylab("Ortalama Günlük Toplam Vaka Değişimi (%)") + xlab(xlabel)+
         scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Ortalama Günlük Toplam Vaka Değişimi (Önceki 7 Gün Ortalaması)")+
         theme(text = element_text(size=14),legend.title=element_blank())+
-        theme(legend.position="bottom") +
-        scale_x_continuous(limits = c(0,50))
+        theme(legend.position="bottom") #+
+        #scale_x_continuous(limits = c(0,50))
       
     }
     
@@ -1669,8 +2004,7 @@ if(input$highlightCountry){
     
     for(counts in 1:length(splitData)){
       
-      print(counts)
-      
+
       
       tmp = splitData[[counts]]
       
@@ -1809,8 +2143,7 @@ if(input$highlightCountry){
     
     for(counts in 1:length(splitData)){
       
-      print(counts)
-      
+
       
       tmp = splitData[[counts]]
       
@@ -1995,7 +2328,132 @@ if(input$highlightCountry){
   })
   
   
-  ######## Başlıklar ####################
+ 
+#### Ülkelerin büyüme faktörleri ######
+  output$growthFactor <- renderPlot({
+    
+    dataset = worldData3(0)
+    data = dataset[[1]]
+
+    
+    splitData = split(data, data$Country)
+    splitList = list()
+    
+    for(i in 1:length(splitData)){
+      
+      tmp = splitData[[i]]
+      
+      c = as.character(tmp$Country[[1]])
+
+      tmp= tmp[order(as.Date(tmp$Date, format="%m/%d/%Y")),]
+      
+      if(nrow(tmp) > 0){
+        tmp$newCases = NA
+        tmp$growthFactor = NA
+        
+        for(j in 1:nrow(tmp)){
+          # print(j)
+          if(j < nrow(tmp)){
+            tmp$newCases[[j+1]] = tmp$Confirmed[j+1]-tmp$Confirmed[j]
+            tmp$growthFactor[j+1] =  (tmp$newCases[j+1])/tmp$newCases[j]
+          }
+          
+        }
+        
+        splitList[[i]] = tmp
+        
+      }
+    }
+    
+    growthFactorData = do.call(rbind.data.frame, splitList)
+    
+
+    splitTime = split(growthFactorData, data$Date)
+    splitFull = list()
+    
+    
+    for(i in 1:length(splitTime)){
+      
+      tmp = dplyr::filter(splitTime[[i]])
+      tmp$dailyTotalCases = sum(splitTime[[i]]$Confirmed, na.rm = TRUE)
+      tmp$dailyTotalDeaths = sum(splitTime[[i]]$Deaths, na.rm = TRUE)
+      tmp$dailyTotalRecovered = sum(splitTime[[i]]$Recovered, na.rm = TRUE)
+      splitFull[[i]] = tmp
+    }
+    
+    growthFactorDataFull = do.call(rbind.data.frame, splitFull)
+    
+    
+    comparedCountries = input$countries
+    indx = which(growthFactorDataFull$Country %in% comparedCountries)
+    compareData = as.data.frame(growthFactorDataFull[indx,])
+    compareData$Country = as.character(compareData$Country)
+    
+    
+    data = compareData[,c("Country", "Date", "growthFactor", "Confirmed", "newCases")]
+    
+    
+    splitData = split(data, data$Country)
+    listData = list()
+    
+    for(i in 1:length(splitData)){
+      
+      tmp = splitData[[i]]
+      tmp2 = tmp[complete.cases(tmp),]
+      
+      tmp3 <- tmp2[is.finite(rowSums(tmp2[,3:4])),]
+      tmp4 = tmp3[tmp3$growthFactor > 0 & tmp3$growthFactor < 5,]
+      
+      meanGrowth = list()
+      tmp4$meanGrowth = NA
+      
+      for(j in 1:(nrow(tmp4)-6)){
+        
+        k=j+6
+        
+        tmp4$meanGrowth[k] = mean(tmp4[j:k, "growthFactor"], na.rm = TRUE)
+        
+        
+      }
+      
+      listData[[i]] = tmp4[complete.cases(tmp4),]
+      
+    }
+    
+    fullData = do.call(rbind.data.frame, listData)
+    fullData[fullData$Country == "France",]
+    
+    
+    firstCase=1000
+    breakPoints = c(firstCase/10,firstCase/10+firstCase/10, firstCase/10+(firstCase/10)*4,
+                    2*firstCase, firstCase+firstCase*9,firstCase+firstCase*49
+                    ,firstCase+firstCase*499)  
+    
+    p = ggplot(data = fullData, aes(x=Confirmed, y=meanGrowth)) + geom_line(aes(colour=Country),size = 1) +
+      geom_point(aes(colour=Country), size=1) + 
+      ylab("Haftalık Ortalama Büyüme Faktörü") + xlab("Toplam Vaka")+
+      scale_colour_discrete("Ülke")+ ggtitle("Ülkelerin Haftalık Ortalama Büyüme Faktörü Değişimi")+
+      theme(text = element_text(size=14),legend.title=element_blank())+
+      scale_x_continuous(trans = "log", breaks = breakPoints) +
+      scale_y_continuous(breaks = round(seq(0.80, 2.5, by = 0.1),3))+
+      geom_hline(yintercept=1, linetype="dashed", size = 1)+
+      theme(legend.position = "bottom")
+    
+
+    
+    if(input$highlightCountry){
+    
+     p = p+
+      gghighlight(fullData$Country == input$highlightCountries, keep_scales = FALSE, use_direct_label = TRUE)
+    
+      }
+    
+    
+    return(p)
+  })
+  
+  
+######## Başlıklar ####################
   
   output$table1 <- renderText({
 

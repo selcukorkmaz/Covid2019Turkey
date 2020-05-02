@@ -1,2 +1,2 @@
-Toplam Vaka	Toplam Ölüm	Toplam İyileşen Vaka	Toplam Aktif Vaka	Ölüm Oranı (%)	Toplam Test	Toplam Vaka (Milyonda)	Test Sayısı (Milyonda)	Vaka Sayısı (Bin Test)
-38226	812	1846	35568	2.12	247768	453	2938	154
+Toplam Vaka	Toplam Ölüm	Toplam İyileşen Vaka	Toplam Aktif Vaka	Ölüm Oranı (%)	Toplam Test	Toplam Vaka (Milyonda)	Test Sayısı (Milyonda)	Test Başına Vaka (%)	Kapanan Vakada Ölüm (%)	Yoğun Bakım Hasta Sayısı	Entübe Hasta Sayısı
+122392	3258	53808	65326	2.66	1075048	1451	12747	11.38	5.71	1480	818

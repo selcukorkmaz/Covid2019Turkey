@@ -63,6 +63,8 @@ ui <- fluidPage(
                   label = "Veri seçiniz",
                   choices = c("Özet", "Tüm")),
       
+      checkboxInput(inputId = "kalmanFilter", label = "Toplam vaka için sonraki gün tahmini ekle", value = FALSE),
+      
       checkboxInput(inputId = "hideStats", label = "Türkiye istatistiklerini gizle", value = FALSE),
 
       # checkboxInput(inputId = "totalDeaths", label = "Ölüm vakalarını ekle", value = TRUE),
@@ -94,7 +96,7 @@ ui <- fluidPage(
                        numericInput("filter", "En az X vaka olan ülkeleri göster", value = 100),
                        numericInput("firstCase", "Verileri en az X adet görülen vakadan başlat (toplam vaka grafiği için)", value = 100),
                        numericInput("firstDeath", "Verileri en az X adet ölümden başlat  (toplam ölüm grafiği için)", value = 10),
-                       numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 10),
+                       # numericInput("firstRecover", "Verileri en az X adet iyileşmeden başlat  (toplam iyileşme grafiği için)", value = 10),
                        numericInput("weeklyNewCase", "Verileri en az X adet ortalama yeni vakadan başlat  (haftalık vaka grafiği için)", value = 200),
                        numericInput("weeklyDeath", "Verileri en az X adet ortalama yeni ölümden başlat  (haftalık ölüm grafiği için)", value = 20)
                        
@@ -125,16 +127,25 @@ ui <- fluidPage(
         uiOutput("totalActiveCases"),
         uiOutput("deathRate"),
         uiOutput("totalTest"),
+        uiOutput("entCases"),
+        uiOutput("deathRateClosedCases"),
+        uiOutput("icuCases"),
+        
         uiOutput("totalCaseMillion"),
         uiOutput("totalCaseThousandTest"),
+        
+        
         uiOutput("totalTesMillion")
+        
         
        ),
         
         DT::dataTableOutput("resultTable"),
         # HTML('<br>'),
         # HTML('<br>'),
-        htmlOutput("turkeyMap"),
+         htmlOutput("turkeyMap"),
+       # htmlOutput("inc"),
+       
        plotlyOutput("plotTotalCases", height = 'auto', width = 'auto'),
        HTML('<br>'),
        HTML('<br>'),
@@ -142,7 +153,13 @@ ui <- fluidPage(
        HTML('<br>'),
        HTML('<br>'),
         # plotOutput("plotTotalDeats"),
-        plotlyOutput("plotTotalTests", height = 'auto', width = 'auto'),
+        plotlyOutput("plotTotalActiveCases", height = 'auto', width = 'auto'),
+       HTML('<br>'),
+       HTML('<br>'),
+       plotlyOutput("plotTotalTests", height = 'auto', width = 'auto'),
+       HTML('<br>'),
+       HTML('<br>'),
+       plotlyOutput("totalClosedDeathRate", height = 'auto', width = 'auto'),
        HTML('<br>'),
        HTML('<br>'),
         plotlyOutput("testVsCasePlot", height = 'auto', width = 'auto'),
@@ -155,7 +172,9 @@ ui <- fluidPage(
        HTML('<br>'),
        HTML('<br>'),
         plotlyOutput("plotTotalTestCaseAdjusted", height = 'auto', width = 'auto'),
-       
+       HTML('<br>'),
+       HTML('<br>'),
+       plotlyOutput("plotTestCaseGrowt", height = 'auto', width = 'auto'),
        HTML('<br>'),
        HTML('<br>'),
         plotlyOutput("barPlotNewCases", height = 'auto', width = 'auto'),
@@ -183,9 +202,14 @@ ui <- fluidPage(
       HTML('Harita kaynağına erişmek için <a href="https://gisanddata.maps.arcgis.com/apps/opsdashboard/index.html#/bda7594740fd40299423467b48e9ecf6" target="_blank"> tıklayınız.</a>'),
       
       
-        HTML('<br>'),
-        HTML('<br>'),
-
+      HTML('<br>'),
+      HTML('<br>'),
+      plotlyOutput("worldStatistics", height = 'auto', width = 'auto'),
+      HTML('<br>'),
+      HTML('<br>'),
+      plotlyOutput("worldStatisticsPopAdjusted", height = 'auto', width = 'auto'),
+      HTML('<br>'),
+      HTML('<br>'),
         plotOutput("compareConfirmed"),
         HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafik ülkelerin resmi
              vaka sayılarının X adet (varsayılan 100) vaka tespit edildikten sonraki geçen zamana bağlı değişimini göstermektedir. Y ekseni logaritmik veya
@@ -206,14 +230,14 @@ ui <- fluidPage(
         HTML('<br>'),
         
         
-        plotOutput("compareRecovered"),
-        HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafik ülkelerin resmi
-             iyileşme sayılarının X adet (varsayılan 10) iyileşme tespit edildikten sonraki geçen zamana bağlı değişimini göstermektedir. Y ekseni logaritmik veya
-             doğrusal ölçekte çizilebilmektedir. Gidişatın daha iyi anlaşılabilmesi adına grafiğin logaritmik ölçekte 
-             incelenmesi önerilmektedir. Katlanma doğruları ile birlikte incelendiğinde
-             ülkelerin toplam iyileşmelerinin zamana bağlı artışları daha iyi karşılaştırılabilir.</p>'),
-        HTML('<br>'),
-        HTML('<br>'),
+        # plotOutput("compareRecovered"),
+        # HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafik ülkelerin resmi
+        #      iyileşme sayılarının X adet (varsayılan 10) iyileşme tespit edildikten sonraki geçen zamana bağlı değişimini göstermektedir. Y ekseni logaritmik veya
+        #      doğrusal ölçekte çizilebilmektedir. Gidişatın daha iyi anlaşılabilmesi adına grafiğin logaritmik ölçekte 
+        #      incelenmesi önerilmektedir. Katlanma doğruları ile birlikte incelendiğinde
+        #      ülkelerin toplam iyileşmelerinin zamana bağlı artışları daha iyi karşılaştırılabilir.</p>'),
+        # HTML('<br>'),
+        # HTML('<br>'),
         
         
         # plotOutput("testComparisonPlot"),
@@ -235,6 +259,8 @@ ui <- fluidPage(
              haftalık ortalama yeni ölüm sayıları karşılaştırılarak salgının gidişatı değerlendirilebilir ve ülkeler arası karşılaştırmalar yapılabilir.</p>'),
         HTML('<br>'),
         HTML('<br>'),
+      
+      
         
         plotOutput("growtRate"),
         HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafik ülkelerin ortalama
@@ -243,12 +269,21 @@ ui <- fluidPage(
              gidişatının hangi yönde olduğu değerlendirilebilir.</p>'),
         HTML('<br>'),
         HTML('<br>'),
+      
+      plotOutput("growthFactor"),
+      HTML("<p align= 'justify'><b>Grafik Açıklaması:</b>Bu grafikte y-ekseninde ülkelerin haftalık ortalama büyüme faktörleri
+           x-ekseninde ise logaritmik ölçekte toplam vaka sayıları bulunmaktadır. 
+           Büyüme faktörü 1'in üzerinde ise günlük yeni vaka sayısının bir önceki günden daha yüksek olduğu, büyüme faktörü 1'in altında ise günlük yeni vaka sayısının bir önceki günden daha düşük olduğu,
+           büyüme faktörü 1'e eşit ise günlük yeni vaka sayısının bir önceki güne göre değişmediği anlamına gelir.</p>"),
+      
+      HTML('<br>'),
+      HTML('<br>'),
         
         plotOutput("testComparisonPopTestAdjustedPlot"),
-      HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafikte toplam vaka sayıları en az 10 bin olan ülkelerin bin test başına tespit ettikleri vaka sayıları ile
+      HTML('<p align= "justify"><b>Grafik Açıklaması:</b> Bu grafikte toplam vaka sayıları en az 10 bin olan ülkelerin 1 milyon nüfusta tespit ettikleri vaka sayıları ile
              1 milyon nüfusa yaptıkları test sayıları için saçılım grafiği oluşturulmuştur. Burada test başına tespit edilen 
            vaka sayısı ile salgının toplumdaki düzeyi, 1 milyon nüfusa yapılan test sayısı ile toplumun ne kadarına test yapıldığı
-           elde edilmeye çalışılmıştır. </p>'),
+           elde edilmeye çalışılmıştır (R-kare = 0.4018). </p>'),
         HTML('<br>'),
         HTML('<br>'),
         plotlyOutput("testComparisonPopTestAdjustedPlot2", height = 'auto', width = 'auto'),
@@ -271,6 +306,7 @@ ui <- fluidPage(
 
         HTML('<br>'),
         HTML('<br>'),
+  
         
         HTML('<p align= "justify"><b>Uyarı:</b> Burada oluşturulan grafiklerden ve elde edilen istatistiklerden yapılan çıkarsamalar hesaba katılamayan bir
              çok faktör (ülkelerin sağlık harcamaları, nüfus yoğunlukları, yaş dağılımları, hastane ve yoğun bakım yatak sayıları, sağlık çalışanı sayıları, kültürel farklılıklar
@@ -287,11 +323,11 @@ ui <- fluidPage(
         # WHERE YOUR FOOTER GOES
         hr(),
         HTML('<p align= "justify"><b>Kaynak kodlar: <a href = "https://github.com/selcukorkmaz/Covid2019Turkey" target="_blank">GitHub</a></b></p>'),
-        HTML('<p align= "justify"><b>Türkiye verileri son güncelleme: 07.04.2020, 19:45</b></p>'),
+        HTML('<p align= "justify"><b>Türkiye verileri son güncelleme: 01.05.2020, 19:30</b></p>'),
         HTML("<p><b>Türkiye verileri <a href = 'https://covid19.saglik.gov.tr' target='_blank'>T.C. Sağlık Bakanlığı</a>'ndan alınmaktadır.</b></p>"),
         HTML('<p align= "justify"><b>Dünya verileri <a href = "https://github.com/CSSEGISandData/COVID-19" target="_blank">JHU CSSE</a> veritabanından alınmaktadır.</b></p>'),
         HTML("<p><b>Katlanma grafikleri <a href = 'https://twitter.com/jburnmurdoch' target='_blank'>John Burn-Murdoch</a>'dan uyarlanmıştır.</b></p>"),
-        HTML("<p><b>Ülkelerin test sayısı ve vaka sayısı karşılaştırma grafiği 6-7 Nisan 2020 tarihleri arasında <a href = 'https://en.wikipedia.org/wiki/COVID-19_testing' target='_blank'> paylaşılan veriler</a> kullanılarak oluşturulmuştur.</b></p>"),
+        HTML("<p><b>Ülkelerin test sayısı ve vaka sayısı karşılaştırma grafiği 27 Nisan-1 Mayıs 2020 tarihleri arasında <a href = 'https://en.wikipedia.org/wiki/COVID-19_testing' target='_blank'> paylaşılan veriler</a> kullanılarak oluşturulmuştur.</b></p>"),
 
         HTML('<b>COVID-19 yayınları:<b>'),
         HTML('<a href="https://www.nejm.org/coronavirus" target="_blank">NEJM</a>'),

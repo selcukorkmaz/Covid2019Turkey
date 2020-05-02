@@ -1,4 +1,4 @@
-worldData2 <- function(filter){
+worldData3 <- function(filter){
     # dataWorld = read.csv(url)
     
     confirmedURL = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
@@ -146,28 +146,7 @@ worldData2 <- function(filter){
         tmpData$MaxRecovered = max(tmpData$Recovered, na.rm = TRUE)
         tmpData$MaxDeaths = max(tmpData$Deaths, na.rm = TRUE)
         tmpData=tmpData[order(as.Date(tmpData$Date, format="%m/%d/%Y")),]
-        
-        
-        if(c == "China"){
-          
-          earlyChina = cbind.data.frame(Province.State = c(NA,NA,NA,NA),
-                                        Country.Region = c("China","China","China","China"),
-                                        Lat = c(37.8099,37.8099,37.8099,37.8099),
-                                        Long = c(101.0583,101.0583,101.0583,101.0583),
-                                        Date = as.factor(c("1/18/20","1/19/20","1/20/20","1/21/20")),
-                                        Confirmed = c(80, 216,235,386),
-                                        Recovered = c(0,0,0,0),
-                                        Deaths =  c(0,0,0,6),
-                                        MaxConfirmed = c(max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE),max(tmpData$Confirmed, na.rm = TRUE)),
-                                        MaxRecovered = c(max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE),max(tmpData$Recovered, na.rm = TRUE)),
-                                        MaxDeaths = c(max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE),max(tmpData$Deaths, na.rm = TRUE)),
-                                        Days = c(1,1,1,1))
-          
-          tmpData = rbind.data.frame(earlyChina, tmpData)
-          
-        }
-        
-        
+  
         newWorldData[[i]] = tmpData
         
       }else{
@@ -176,35 +155,7 @@ worldData2 <- function(filter){
         pData$Days = seq(1, length(unique(pData$Date)), 1)
         pData=pData[order(as.Date(pData$Date, format="%m/%d/%Y")),]
         
-        if(c == "Turkey"){
-          
-          
-          insertRow <- function(existingDF, newrow, r) {
-            existingDF[seq(r+1,nrow(existingDF)+1),] <- existingDF[seq(r,nrow(existingDF)),]
-            existingDF[r,] <- newrow
-            existingDF
-          }
-          
-          missingTurkey = cbind.data.frame( Date = as.factor("3/21/20"),
-                                            Country.Region = c("Turkey"),
-                                            Province.State = c(NA),
-                                            Lat = c(38.9637),
-                                            Long = c(35.2433),
-                                            Confirmed = c(947),
-                                            Recovered = c(0),
-                                            Deaths =  c(21),
-                                            MaxConfirmed = max(pData$Confirmed, na.rm = TRUE),
-                                            MaxRecovered = max(pData$Recovered, na.rm = TRUE),
-                                            MaxDeaths = max(pData$Deaths, na.rm = TRUE),
-                                            Days = c(0))
-          missingTurkey$Date = as.character(missingTurkey$Date)
-          missingTurkey = missingTurkey[c("Province.State","Country.Region", "Lat","Long", "Date", "Confirmed", "Deaths", "Recovered", "MaxConfirmed",
-                                          "MaxRecovered", "MaxDeaths")]
-          pData = insertRow(pData, missingTurkey, r = nrow(pData[pData$Confirmed <= 1236,]))
-          
-          
-          
-        }
+
         
         newWorldData[[i]] = pData
         
@@ -223,56 +174,8 @@ worldData2 <- function(filter){
     
     newWorldDataFull = rbind.data.frame(newWorldDataFull, tmpCanada)
     
-    splitData = split(newWorldDataFull,newWorldDataFull$Country)
-    # splitDataList = list()
-    
-    for(counts in 1:length(splitData)){
-      splitData[[counts]]$NewCases = NA
-      splitData[[counts]]$NewDeaths = NA
-      splitData[[counts]]$NewRecovered = NA
-    
-    for(k in 2:nrow(splitData[[counts]])){
-      
-      splitData[[counts]]$NewCases[k] = splitData[[counts]]$Confirmed[k]-splitData[[counts]]$Confirmed[k-1]
-      splitData[[counts]]$NewDeaths[k] = splitData[[counts]]$Deaths[k]-splitData[[counts]]$Deaths[k-1]
-      splitData[[counts]]$NewRecovered[k] = splitData[[counts]]$Recovered[k]-splitData[[counts]]$Recovered[k-1]
-      
-      
-    }
-      
-    }
 
-    newWorldDataFull = do.call(rbind.data.frame, splitData) 
-    
-    
-    
-    colnames(newWorldDataFull)[1] = "Country"
-    
-    dataCountries = newWorldDataFull[,c("Country", "MaxConfirmed", "MaxDeaths", "MaxRecovered", "NewCases", "NewDeaths", "NewRecovered")]
-    
-    
-    
-    splitData = split(dataCountries,dataCountries$Country)
-    # splitDataList = list()
-    
-    for(counts in 1:length(splitData)){
-      
-
-        splitData[[counts]] = splitData[[counts]][nrow(splitData[[counts]]),]
-    
-      
-    }
-    
-    dataCountries = do.call(rbind.data.frame, splitData) 
-    
-    dataCountries[dataCountries$NewRecovered<0,"NewRecovered"] = NA
-    dataCountries[dataCountries$NewCases<0,"NewCases"] = NA
-    dataCountries[dataCountries$NewDeaths<0,"NewDeaths"] = NA
-    
-    dataCountries = dataCountries[!duplicated(dataCountries), ]
-    dataCountries$Country = as.character(dataCountries$Country)
-    
-    population = TRUE
+    population = FALSE
     
     
     if(population){
@@ -280,29 +183,25 @@ worldData2 <- function(filter){
                                na.strings=".", stringsAsFactors=FALSE,
                                quote="", fill=FALSE)
       
-      population$Country = as.character(population$Country)
       
-      population$Country[population$Country=="United States"] = "US"
-      population$Country[population$Country=="Taiwan"] = "Taiwan*"
-      population$Country[population$Country=="South Korea"] = "Korea, South"
+      mergedData <- left_join(newWorldDataFull, population, by = c("Country" ))
       
-      mergedData <- left_join(dataCountries, population, by = c("Country" ))
-      mergedData=mergedData[complete.cases(mergedData),]
-      
-      mergedData$popAdjustedCase = round(1000000/(mergedData$Population/mergedData$MaxConfirmed),0)
-      mergedData$popAdjustedDeaths = round(1000000/(mergedData$Population/mergedData$MaxDeaths),0)
-      mergedData$popAdjustedRecovered = round(1000000/(mergedData$Population/mergedData$MaxRecovered),0)
+      newWorldDataFull$popAdjustedCase = 1000000/(mergedData$Population/mergedData$Confirmed)
+      newWorldDataFull$popAdjustedDeaths = 1000000/(mergedData$Population/mergedData$Deaths)
+      newWorldDataFull$popAdjustedRecovered = 1000000/(mergedData$Population/mergedData$Recovered)
       
     }
     
-    mergedData = mergedData[c(1:7,19:21,9:13,15:18)]
+    colnames(newWorldDataFull)[1] = "Country"
+    
+    dataCountries = newWorldDataFull[,c("Country", "MaxConfirmed", "MaxDeaths", "MaxRecovered")]
+    dataCountries = dataCountries[!duplicated(dataCountries), ]
     
     newWorldDataFull = dplyr::filter(newWorldDataFull, MaxConfirmed >= filter)
     
     countries = as.character(newWorldDataFull$Country)
-    selectedCountries = dplyr::filter(dataCountries, dataCountries$MaxConfirmed>10000)
-    countriesDisplayed = as.character(selectedCountries$Country)
-    data = list(newWorldDataFull, countries, dataCountries, mergedData, countriesDisplayed)
+    
+    data = list(newWorldDataFull, countries, dataCountries)
     
 
     return(data)
